@@ -1,0 +1,42 @@
+# --- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# --- Environments ---------------------------------------------------------
+.env
+.venv/
+venv/
+
+# --- Tooling caches -------------------------------------------------------
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Spark ----------------------------------------------------------------
+spark-warehouse/
+metastore_db/
+derby.log
+*.crc
+
+# --- depipe ---------------------------------------------------------------
+.depipe/
+
+# --- Terraform ------------------------------------------------------------
+# Environment and per-job .tfvars ARE committed (no secrets in them).
+# Secrets come from AWS_PROFILE / environment, never tfvars.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.auto.tfvars
+crash.log
+
+# --- IDE / OS -------------------------------------------------------------
+.idea/
+.vscode/
+.DS_Store

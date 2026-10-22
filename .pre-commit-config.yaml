@@ -1,0 +1,42 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  # ruff runs as local hooks with the ruff installed from the dev extras, the same one
+  # `ruff check` and `ruff format` use everywhere else. A pinned ruff-pre-commit rev drifts
+  # from that version and the two can disagree on formatting, failing CI.
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: ruff check --fix
+        language: system
+        types: [python]
+
+      - id: ruff-format
+        name: ruff-format
+        entry: ruff format
+        language: system
+        types: [python]
+
+      - id: mypy
+        name: mypy
+        entry: mypy src/
+        language: system
+        pass_filenames: false
+        types: [python]
+
+  # NOTE: no terraform_fmt / terraform_validate hooks. CI runs `pre-commit run
+  # --all-files` in the `quality` job, which sets up Python only - these hooks
+  # shell out to the `terraform` binary and would fail there unconditionally.
+  # `terraform_validate` could not have worked there even with the binary, as
+  # it needs an initialised directory and nothing runs `init` in that job.
+  # Terraform is covered by the dedicated `terraform` CI job (fmt -check, init,
+  # validate) and locally by `make fmt`. Do not re-add them without also moving
+  # the pre-commit step out of the Python-only job.

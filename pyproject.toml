@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kpi_lakehouse"
+description = "Data engineering pipeline for kpi_lakehouse"
+readme = "README.md"
+requires-python = "~=3.11.0"
+license = { text = "Proprietary" }
+dynamic = ["version"]
+dependencies = [
+    "pyspark==3.5.4",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+dev = [
+    "kpi_lakehouse[test]",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+]
+
+[tool.hatch.version]
+path = "src/kpi_lakehouse/__init__.py"
+
+# --- Ruff -----------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# The transformation-module import header is scaffold-owned and fixed: it declares the whole
+# namespace a generated transformation function is allowed to reference, so names in it are
+# legitimately unused before `generate codegen` fills the bodies -- and after, for any job
+# whose transformations don't happen to need all of them.
+"**/*_transformations.py" = ["F401"]
+# Each job's fixture modules import every value type a row may hold, so rows of any type can
+# be written without touching the imports. A hash in a row is written
+# md5("<text>".encode("utf-8")).hexdigest(): UP012 would drop the "utf-8", there and in
+# `generate expected-outputs`' own `ruff check --fix`.
+"tests/fixtures/**" = ["F401", "UP012"]
+
+# --- mypy -----------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+
+# PySpark ships incomplete type stubs; silence import noise.
+[[tool.mypy.overrides]]
+module = ["pyspark.*", "delta.*"]
+ignore_missing_imports = true
+
+# --- pytest ---------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# --- coverage -------------------------------------------------------------
+[tool.coverage.run]
+source = ["src"]
+branch = true
