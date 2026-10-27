@@ -56,9 +56,7 @@ def filter_version_starts(create_tracked_columns_result: DataFrame) -> DataFrame
         DataFrame containing only rows where is_version_start is True,
         with the is_version_start column removed.
     """
-    return create_tracked_columns_result.filter(F.col("is_version_start")).drop(
-        "is_version_start"
-    )
+    return create_tracked_columns_result.filter(F.col("is_version_start")).drop("is_version_start")
 
 
 def add_validity_window(filter_version_starts_result: DataFrame) -> DataFrame:

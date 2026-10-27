@@ -51,7 +51,7 @@ def keep_latest_status(create_order_date_result: DataFrame) -> DataFrame:
     """
     max_export_date = create_order_date_result.agg(F.max("export_date")).collect()[0][0]
     lookback_start = F.date_sub(F.lit(max_export_date), 14)
-    filtered = create_order_date_result.filter(~ F.col("is_test_order")).filter(
+    filtered = create_order_date_result.filter(~F.col("is_test_order")).filter(
         F.col("export_date") >= lookback_start
     )
     window = Window.partitionBy("order_id").orderBy(F.col("updated_at").desc())
