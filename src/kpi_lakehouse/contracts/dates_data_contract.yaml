@@ -1,0 +1,12 @@
+# Source contract dates: data no job in this project writes. Written by
+# `scaffold create-source-contracts` for fx_rates. Describe the files exactly as they are on
+# disk. Generation-time input; never deployed.
+contract:
+  layer: raw                  # raw | preprocessed | processed
+  dataset: dates
+  file_format: json
+  schema:                     # include the partition column, typed date
+    - name: date
+      type: date
+      nullable: false
+

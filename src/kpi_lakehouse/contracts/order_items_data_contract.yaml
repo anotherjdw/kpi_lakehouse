@@ -1,0 +1,60 @@
+# Output contract of the order_items ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: preprocessed
+  dataset: order_items
+  description: Items contained in orders placed by the customer.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [order_id, line_number]    # checked for duplicates on every write
+  schema: # include the partition column, typed date
+    - name: order_date
+      type: date
+      nullable: false
+      description: "Date the order was placed (UTC). Partition column."
+    - name: order_id
+      type: string
+      nullable: false
+      description: "Foreign key to orders.order_id."
+    - name: line_number
+      type: int
+      nullable: false
+      description: "Position of the line within the order, starting at 1."
+      constraints:
+        min: 1
+    - name: product_id
+      type: string
+      nullable: false
+      description: "Foreign key to products.product_id."
+    - name: quantity
+      type: int
+      nullable: false
+      description: "Units ordered."
+      constraints:
+        min: 1
+    - name: unit_price
+      type: decimal(12,2)
+      nullable: false
+      description: "Price charged per unit, in the order's currency, including VAT, before discount."
+    - name: discount_amount
+      type: decimal(12,2)
+      nullable: false
+      description: "Total discount on the line, in the order's currency, including any voucher value allocated to it."
+    - name: tax_rate
+      type: decimal(5,4)
+      nullable: false
+      description: "VAT rate included in unit_price, e.g. 0.1900."
+    - name: rate
+      type: decimal(18,8)
+      nullable: false
+      description: "Units of the order's currency per 1 EUR, as of order_date. An amount converts to EUR as amount / rate."
+    - name: gross_amount_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Price charged for all units purchased in Euros, including VAT, after discount."
+    - name: net_amount_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Price charged for all units purchased in Euros, excluding VAT, after discount."
+

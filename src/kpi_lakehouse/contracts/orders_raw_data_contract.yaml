@@ -1,0 +1,72 @@
+# Source contract orders_raw: data no job in this project writes. Describe the files exactly as
+# they are on disk. Generation-time input; never deployed.
+contract:
+  layer: raw                  # raw | preprocessed | processed
+  dataset: orders
+  file_format: json
+  partition_key: export_date
+  description: >
+    Order headers exported by the shop backend. A record is exported each time an order's status
+    changes, so one order_id appears once per status version, and later versions land in later
+    export_date partitions.
+  owner: Shop backend (order service)
+  classification:
+    contains_pii: false
+  freshness:
+    cadence: daily
+    max_lateness: 14 days (status changes until delivery)
+  grain:
+    unique_key: [order_id, updated_at]
+  schema:                     # include the partition column, typed date
+    - name: export_date
+      type: date
+      nullable: false
+      description: "Date the record was exported. Partition column; not the order date."
+    - name: order_id
+      type: string
+      nullable: false
+      description: "Natural key of the order."
+    - name: customer_id
+      type: string
+      nullable: false
+      description: "Foreign key to customers.customer_id."
+    - name: session_id
+      type: string
+      nullable: true
+      description: "Foreign key to session_events.session_id. Null for orders placed by customer service or without a tracked session."
+    - name: order_ts
+      type: timestamp
+      nullable: false
+      description: "Time the order was placed (UTC)."
+    - name: order_status
+      type: string
+      nullable: false
+      description: "Status of this version: placed | paid | shipped | delivered | cancelled."
+    - name: updated_at
+      type: timestamp
+      nullable: false
+      description: "Time this status version was written (UTC). The latest version per order_id is the current one."
+    - name: currency_code
+      type: string
+      nullable: false
+      description: "ISO 4217 currency the order was charged in: EUR | CHF | PLN | SEK | DKK."
+    - name: shipping_fee
+      type: decimal(12,2)
+      nullable: false
+      description: "Shipping fee charged, in currency_code, including VAT."
+    - name: voucher_code
+      type: string
+      nullable: true
+      description: "Voucher redeemed on the order. Its value is already allocated to order_items.discount_amount."
+    - name: payment_method
+      type: string
+      nullable: false
+      description: "card | paypal | klarna_invoice | bank_transfer."
+    - name: shipping_country
+      type: string
+      nullable: false
+      description: "ISO 3166-1 alpha-2 country the order ships to."
+    - name: is_test_order
+      type: boolean
+      nullable: false
+      description: "True for internal QA orders; excluded from every report."

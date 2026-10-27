@@ -1,0 +1,53 @@
+# Job spec for the marketing_spend ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/marketing_spend/ and its tests:
+# tests/unit/marketing_spend/, tests/integration/test_marketing_spend_integration.py,
+# tests/end_to_end/test_marketing_spend_e2e.py and tests/fixtures/marketing_spend/.
+job:
+  name: marketing_spend
+  description: >
+    Daily spend per campaign pulled from the advertising platforms' reporting APIs. Platforms
+    restate the last three days as late clicks and invalid traffic are settled, so a
+    spend_date and campaign can be reported several times; the latest reported_at wins.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - contract: marketing_spend_raw
+      alias: marketing_spend
+      allow_empty: false  # true lets this source read no rows without failing the run
+      lookback_days: 1    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+    - job: fx_rates
+      alias: fx_rates
+      allow_empty: false
+      lookback_days: 1
+  sink:
+    contract: marketing_spend   # the output contract: contracts/marketing_spend_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: spend_date
+  transformations:
+    - name: join fx rates
+      description: left join the fx_rates dataset onto the marketing_spend data, joined on the columns `spend_date=rate_date` and `quote_currency=currency_code`
+      inputs: [ fx_rates, marketing_spend ]
+      output:
+        grain_change: false
+        removes_columns: [base_currency]
+    - name: keep latest restatement
+      description: Keep the latest reported_at per spend date, platform and campaign.
+      inputs: [join fx rates]
+      depends_on: [join fx rates]
+      output:
+        grain_change: false
+    - name: convert spend amount to euros
+      description: Create a spend_amount_eur column by dividing spend_amount by rate.
+      inputs: [keep latest restatement]
+      depends_on: [keep latest restatement]
+      output:
+        grain_change: false
+        removes_columns: [spend_amount, rate, quote_currency, rate_date]
+        columns:
+          - name: spend_amount_eur
+            type: decimal(12,2)

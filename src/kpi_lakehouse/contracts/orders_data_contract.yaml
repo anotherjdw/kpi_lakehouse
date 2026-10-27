@@ -1,0 +1,79 @@
+# Output contract of the orders ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: preprocessed
+  dataset: orders
+  description: Latest version of order records ingested from the backend.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [order_id, updated_at]    # checked for duplicates on every write
+  schema: # include the partition column, typed date
+    - name: order_date
+      type: date
+      nullable: false
+      description: "Date the order was placed (UTC)."
+    - name: export_date
+      type: date
+      nullable: false
+      description: "Date the record was exported. Partition column; not the order date."
+    - name: order_id
+      type: string
+      nullable: false
+      description: "Natural key of the order."
+    - name: customer_id
+      type: string
+      nullable: false
+      description: "Foreign key to customers.customer_id."
+    - name: session_id
+      type: string
+      nullable: true
+      description: "Foreign key to session_events.session_id. Null for orders placed by customer service or without a tracked session."
+    - name: order_ts
+      type: timestamp
+      nullable: false
+      description: "Time the order was placed (UTC)."
+    - name: order_status
+      type: string
+      nullable: false
+      description: "Status of this version: placed | paid | shipped | delivered | cancelled."
+    - name: updated_at
+      type: timestamp
+      nullable: false
+      description: "Time this status version was written (UTC). The latest version per order_id is the current one."
+    - name: currency_code
+      type: string
+      nullable: false
+      description: "ISO 4217 currency the order was charged in: EUR | CHF | PLN | SEK | DKK."
+    - name: voucher_code
+      type: string
+      nullable: true
+      description: "Voucher redeemed on the order. Its value is already allocated to order_items.discount_amount."
+    - name: payment_method
+      type: string
+      nullable: false
+      description: "card | paypal | klarna_invoice | bank_transfer."
+    - name: shipping_country
+      type: string
+      nullable: false
+      description: "ISO 3166-1 alpha-2 country the order ships to."
+    - name: rate_date
+      type: date
+      nullable: false
+      description: "Date of the rate used to convert the shipping fee; equals order_date."
+    - name: base_currency
+      type: string
+      nullable: false
+      description: "Always EUR."
+    - name: quote_currency
+      type: string
+      nullable: false
+      description: "ISO 4217 currency of the rate used; equals currency_code."
+    - name: rate
+      type: decimal(18,8)
+      nullable: false
+      description: "Units of quote_currency per 1 EUR. An amount converts to EUR as amount / rate."
+    - name: shipping_fee_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Shipping fee charged, in Euros, including VAT."

@@ -1,0 +1,69 @@
+# Output contract of the returns ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: preprocessed
+  dataset: returns
+  description: Event level records of returns of orders placed by customers.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [ return_id, updated_at ]
+  schema: # include the partition column, typed date
+    - name: update_date
+      type: date
+      nullable: false
+      description: "Date this status version was written (UTC). The latest version per return_id is the current one."
+    - name: export_date
+      type: date
+      nullable: false
+      description: "Date the record was exported. Partition column."
+    - name: return_id
+      type: string
+      nullable: false
+      description: "Natural key of the return."
+    - name: order_id
+      type: string
+      nullable: false
+      description: "Foreign key to orders.order_id."
+    - name: line_number
+      type: int
+      nullable: false
+      description: "With order_id, foreign key to order_items."
+    - name: product_id
+      type: string
+      nullable: false
+      description: "Foreign key to products.product_id; repeats the order line's product."
+    - name: requested_ts
+      type: timestamp
+      nullable: false
+      description: "Time the customer registered the return (UTC)."
+    - name: quantity_returned
+      type: int
+      nullable: false
+      description: "Units returned; at most the order line's quantity."
+      constraints:
+        min: 1
+    - name: return_reason
+      type: string
+      nullable: false
+      description: "wrong_size | damaged | not_as_described | changed_mind | other."
+    - name: return_status
+      type: string
+      nullable: false
+      description: "requested | received | refunded | rejected."
+    - name: updated_at
+      type: timestamp
+      nullable: false
+      description: "Time this status version was written (UTC). The latest version per return_id is the current one."
+    - name: tax_rate
+      type: decimal(5,4)
+      nullable: true
+      description: "VAT rate of the returned order line, e.g. 0.1900. Null when the order line isn't in the order_items rows read."
+    - name: refund_amount_eur
+      type: decimal(12,2)
+      nullable: true
+      description: "Amount refunded in Euros, including VAT. Null until return_status is refunded."
+    - name: net_refund_eur
+      type: decimal(12,2)
+      nullable: true
+      description: "Amount refunded in Euros, excluding VAT. Null until return_status is refunded."

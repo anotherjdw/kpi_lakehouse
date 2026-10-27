@@ -1,0 +1,55 @@
+# Source contract order_items_raw: data no job in this project writes. Describe the files exactly
+# as they are on disk. Generation-time input; never deployed.
+contract:
+  layer: raw                  # raw | preprocessed | processed
+  dataset: order_items
+  file_format: json
+  partition_key: order_date
+  description: >
+    Order lines exported by the shop backend once, when the order is placed. Lines never change
+    afterwards; cancellations and returns are recorded on orders and returns.
+  owner: Shop backend (order service)
+  classification:
+    contains_pii: false
+  freshness:
+    cadence: daily
+    max_lateness: 1 day
+  grain:
+    unique_key: [order_id, line_number]
+  schema:                     # include the partition column, typed date
+    - name: order_date
+      type: date
+      nullable: false
+      description: "Date the order was placed (UTC). Partition column."
+    - name: order_id
+      type: string
+      nullable: false
+      description: "Foreign key to orders.order_id."
+    - name: line_number
+      type: int
+      nullable: false
+      description: "Position of the line within the order, starting at 1."
+      constraints:
+        min: 1
+    - name: product_id
+      type: string
+      nullable: false
+      description: "Foreign key to products.product_id."
+    - name: quantity
+      type: int
+      nullable: false
+      description: "Units ordered."
+      constraints:
+        min: 1
+    - name: unit_price
+      type: decimal(12,2)
+      nullable: false
+      description: "Price charged per unit, in the order's currency, including VAT, before discount."
+    - name: discount_amount
+      type: decimal(12,2)
+      nullable: false
+      description: "Total discount on the line, in the order's currency, including any voucher value allocated to it."
+    - name: tax_rate
+      type: decimal(5,4)
+      nullable: false
+      description: "VAT rate included in unit_price, e.g. 0.1900."

@@ -1,0 +1,27 @@
+# Output contract of the fx_rates ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: preprocessed
+  dataset: fx_rates
+  description: Provides currency rates to enable conversion of fees and prices to Euros.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [rate_date, quote_currency]    # checked for duplicates on every write
+  schema: # include the partition column, typed date
+    - name: rate_date
+      type: date
+      nullable: false
+      description: "Date the rate was published. Partition column."
+    - name: base_currency
+      type: string
+      nullable: false
+      description: "Always EUR."
+    - name: quote_currency
+      type: string
+      nullable: false
+      description: "ISO 4217 currency quoted, e.g. CHF, PLN, SEK, DKK. EUR itself is not listed."
+    - name: rate
+      type: decimal(18,8)
+      nullable: false
+      description: "Units of quote_currency per 1 EUR. An amount converts to EUR as amount / rate."

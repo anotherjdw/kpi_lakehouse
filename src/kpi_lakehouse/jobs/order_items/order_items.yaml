@@ -1,0 +1,76 @@
+# Job spec for the order_items ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/order_items/ and its tests:
+# tests/unit/order_items/, tests/integration/test_order_items_integration.py,
+# tests/end_to_end/test_order_items_e2e.py and tests/fixtures/order_items/.
+job:
+  name: order_items
+  description: Items contained in orders placed by the customer.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - contract: order_items_raw
+      alias: order_items
+      allow_empty: false
+      lookback_days: 14
+    - job: orders   # instead of contract, to read another job's output; create that job first
+      alias: orders
+      allow_empty: false  # true lets this source read no rows without failing the run
+      # The dates this source reads, if it is partitioned by date; an unpartitioned source sets none.
+      lookback_days: 14    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      # start_date: 2026-01-01   # YYYY-MM-DD; set both dates when type is backfill, neither for lookback
+      # end_date: 2026-01-01     # backfill processes every day from start_date to end_date
+  sink:
+    contract: order_items   # the output contract: contracts/order_items_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: order_date
+  transformations:
+    - name: join order data
+      description: >
+        Select order_date, order_id and rate from the orders data set. Left join orders to order_items on order_id and order_date.
+      inputs: [orders, order_items]
+      output:
+        grain_change: false
+        removes_columns: [export_date, customer_id, session_id, order_ts, order_status, updated_at, currency_code, voucher_code, payment_method, shipping_country, rate_date, base_currency, quote_currency, shipping_fee_eur]
+    - name: create gross amount
+      description: create a gross amount column as quantity * unit_price - discount_amount. discount_amount is the discount on the whole line, not per unit.
+      inputs: [join order data]
+      depends_on: [join order data]
+      output:
+        grain_change: false
+        columns:
+          - name: gross_amount
+            type: decimal(12,2)
+    - name: create net amount
+      description: create a net amount column by dividing gross amount by (1 + tax_rate).
+      inputs: [create gross amount]
+      depends_on: [create gross amount]
+      output:
+        grain_change: false
+        columns:
+          - name: net_amount
+            type: decimal(12, 2)
+    - name: convert gross amount to euros
+      description: create a gross_amount_eur by dividing gross_amount by rate.
+      inputs: [create net amount]
+      depends_on: [create net amount]
+      output:
+        grain_change: false
+        removes_columns: [gross_amount]
+        columns:
+          - name: gross_amount_eur
+            type: decimal(12,2)
+    - name: convert net amount to euros
+      description: create a net_amount_eur by dividing net_amount by rate.
+      inputs: [ convert gross amount to euros ]
+      depends_on: [ convert gross amount to euros ]
+      output:
+        grain_change: false
+        removes_columns: [ net_amount ]
+        columns:
+          - name: net_amount_eur
+            type: decimal(12,2)

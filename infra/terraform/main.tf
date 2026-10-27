@@ -52,7 +52,216 @@ module "catalog" {
   # ---------------------------------------------------------------------------
   # BEGIN Hive tables (managed by engineering-automation -- do not edit by hand)
   # >>> AMEND:TABLES
-  tables = {}
+  tables = {
+    "preprocessed/category" = {
+      layer       = "preprocessed"
+      dataset     = "category"
+      description = "Internal flattened catalog of product categories."
+      partition_keys = [
+        { name = "snapshot_date", type = "date", comment = "Date the snapshot reflects. Partition column." },
+      ]
+      columns = [
+        { name = "category_id", type = "string", nullable = false, comment = "Natural key of the category." },
+        { name = "category_name", type = "string", nullable = false, comment = "Display name, e.g. Running Shoes." },
+        { name = "parent_category_id", type = "string", nullable = true, comment = "category_id of the parent. Null for a root category." },
+        { name = "is_active", type = "boolean", nullable = false, comment = "False once the category is retired; retired categories stay for history." },
+        { name = "updated_at", type = "timestamp", nullable = false, comment = "Time the category was last changed (UTC)." },
+        { name = "category_id_level_1", type = "string", nullable = false, comment = "First level parent category of the category_id." },
+        { name = "category_id_level_2", type = "string", nullable = true, comment = "Second level parent category of the category_id." },
+        { name = "category_id_level_3", type = "string", nullable = true, comment = "Third level parent category of the category_id." },
+        { name = "category_id_level_4", type = "string", nullable = true, comment = "Fourth level parent category of the category_id." },
+      ]
+    }
+    "preprocessed/customers" = {
+      layer       = "preprocessed"
+      dataset     = "customers"
+      description = "Versioned customer data."
+      partition_keys = [
+        { name = "snapshot_date", type = "date", comment = "Date the snapshot reflects. Partition column." },
+      ]
+      columns = [
+        { name = "customer_id", type = "string", nullable = false, comment = "Natural key of the customer. Kept after erasure." },
+        { name = "email", type = "string", nullable = true, comment = "SHA256 hashed value of customer email address. Null after erasure." },
+        { name = "signup_ts", type = "timestamp", nullable = false, comment = "Time the account was created (UTC)." },
+        { name = "country_code", type = "string", nullable = true, comment = "ISO 3166-1 alpha-2 country of the default address. Null after erasure." },
+        { name = "postal_code", type = "string", nullable = true, comment = "Postal code of the default address. Null after erasure." },
+        { name = "customer_segment", type = "string", nullable = false, comment = "standard | plus (paid membership) | business. Can change over time." },
+        { name = "marketing_opt_in", type = "boolean", nullable = false, comment = "Whether the customer consents to marketing email. Can change over time." },
+        { name = "is_deleted", type = "boolean", nullable = false, comment = "True once the customer requested erasure under GDPR Art. 17." },
+        { name = "valid_from", type = "date", nullable = false, comment = "Snapshot date on which this version of the customer's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one." },
+        { name = "valid_to", type = "date", nullable = true, comment = "Snapshot date on which the next version was first observed. Null for the current version." },
+        { name = "customer_version_id", type = "string", nullable = false, comment = "SHA256 hashed ID of the concatenation of the customer_id and valid_from fields." },
+        { name = "birth_year", type = "int", nullable = true, comment = "Year of birth, optional at signup. Null after erasure." },
+      ]
+    }
+    "preprocessed/fx_rates" = {
+      layer       = "preprocessed"
+      dataset     = "fx_rates"
+      description = "Provides currency rates to enable conversion of fees and prices to Euros."
+      partition_keys = [
+        { name = "rate_date", type = "date", comment = "Date the rate was published. Partition column." },
+      ]
+      columns = [
+        { name = "base_currency", type = "string", nullable = false, comment = "Always EUR." },
+        { name = "quote_currency", type = "string", nullable = false, comment = "ISO 4217 currency quoted, e.g. CHF, PLN, SEK, DKK. EUR itself is not listed." },
+        { name = "rate", type = "decimal(18,8)", nullable = false, comment = "Units of quote_currency per 1 EUR. An amount converts to EUR as amount / rate." },
+      ]
+    }
+    "preprocessed/marketing_spend" = {
+      layer       = "preprocessed"
+      dataset     = "marketing_spend"
+      description = "Daily spend per campaign pulled from the advertising platforms' reporting APIs. Platforms restate the last three days as late clicks and invalid traffic are settled, so a spend_date and campaign can be reported several times; the latest reported_at wins."
+      partition_keys = [
+        { name = "spend_date", type = "date", comment = "Date the spend was incurred, in the platform's account time zone. Partition column." },
+      ]
+      columns = [
+        { name = "platform", type = "string", nullable = false, comment = "google_ads | meta | tiktok | affiliate_network | newsletter_tool." },
+        { name = "campaign_id", type = "string", nullable = false, comment = "Campaign ID within the platform." },
+        { name = "campaign_name", type = "string", nullable = false, comment = "Campaign name as set in the platform." },
+        { name = "utm_source", type = "string", nullable = true, comment = "utm_source the campaign's links carry." },
+        { name = "utm_medium", type = "string", nullable = true, comment = "utm_medium the campaign's links carry." },
+        { name = "utm_campaign", type = "string", nullable = true, comment = "utm_campaign the campaign's links carry; joins spend to sessions." },
+        { name = "impressions", type = "bigint", nullable = false, comment = "Ad impressions reported for the day." },
+        { name = "clicks", type = "bigint", nullable = false, comment = "Ad clicks reported for the day." },
+        { name = "spend_amount_eur", type = "decimal(12,2)", nullable = false, comment = "Spend for the day in Euros, excluding VAT." },
+        { name = "currency_code", type = "string", nullable = false, comment = "ISO 4217 currency of the platform account." },
+        { name = "reported_at", type = "timestamp", nullable = false, comment = "Time the platform reported this figure (UTC). Later reports replace earlier ones." },
+      ]
+    }
+    "preprocessed/order_items" = {
+      layer       = "preprocessed"
+      dataset     = "order_items"
+      description = "Items contained in orders placed by the customer."
+      partition_keys = [
+        { name = "order_date", type = "date", comment = "Date the order was placed (UTC). Partition column." },
+      ]
+      columns = [
+        { name = "order_id", type = "string", nullable = false, comment = "Foreign key to orders.order_id." },
+        { name = "line_number", type = "int", nullable = false, comment = "Position of the line within the order, starting at 1." },
+        { name = "product_id", type = "string", nullable = false, comment = "Foreign key to products.product_id." },
+        { name = "quantity", type = "int", nullable = false, comment = "Units ordered." },
+        { name = "unit_price", type = "decimal(12,2)", nullable = false, comment = "Price charged per unit, in the order's currency, including VAT, before discount." },
+        { name = "discount_amount", type = "decimal(12,2)", nullable = false, comment = "Total discount on the line, in the order's currency, including any voucher value allocated to it." },
+        { name = "tax_rate", type = "decimal(5,4)", nullable = false, comment = "VAT rate included in unit_price, e.g. 0.1900." },
+        { name = "rate", type = "decimal(18,8)", nullable = false, comment = "Units of the order's currency per 1 EUR, as of order_date. An amount converts to EUR as amount / rate." },
+        { name = "gross_amount_eur", type = "decimal(12,2)", nullable = false, comment = "Price charged for all units purchased in Euros, including VAT, after discount." },
+        { name = "net_amount_eur", type = "decimal(12,2)", nullable = false, comment = "Price charged for all units purchased in Euros, excluding VAT, after discount." },
+      ]
+    }
+    "preprocessed/orders" = {
+      layer       = "preprocessed"
+      dataset     = "orders"
+      description = "Latest version of order records ingested from the backend."
+      partition_keys = [
+        { name = "order_date", type = "date", comment = "Date the order was placed (UTC)." },
+      ]
+      columns = [
+        { name = "export_date", type = "date", nullable = false, comment = "Date the record was exported. Partition column; not the order date." },
+        { name = "order_id", type = "string", nullable = false, comment = "Natural key of the order." },
+        { name = "customer_id", type = "string", nullable = false, comment = "Foreign key to customers.customer_id." },
+        { name = "session_id", type = "string", nullable = true, comment = "Foreign key to session_events.session_id. Null for orders placed by customer service or without a tracked session." },
+        { name = "order_ts", type = "timestamp", nullable = false, comment = "Time the order was placed (UTC)." },
+        { name = "order_status", type = "string", nullable = false, comment = "Status of this version: placed | paid | shipped | delivered | cancelled." },
+        { name = "updated_at", type = "timestamp", nullable = false, comment = "Time this status version was written (UTC). The latest version per order_id is the current one." },
+        { name = "currency_code", type = "string", nullable = false, comment = "ISO 4217 currency the order was charged in: EUR | CHF | PLN | SEK | DKK." },
+        { name = "voucher_code", type = "string", nullable = true, comment = "Voucher redeemed on the order. Its value is already allocated to order_items.discount_amount." },
+        { name = "payment_method", type = "string", nullable = false, comment = "card | paypal | klarna_invoice | bank_transfer." },
+        { name = "shipping_country", type = "string", nullable = false, comment = "ISO 3166-1 alpha-2 country the order ships to." },
+        { name = "rate_date", type = "date", nullable = false, comment = "Date of the rate used to convert the shipping fee; equals order_date." },
+        { name = "base_currency", type = "string", nullable = false, comment = "Always EUR." },
+        { name = "quote_currency", type = "string", nullable = false, comment = "ISO 4217 currency of the rate used; equals currency_code." },
+        { name = "rate", type = "decimal(18,8)", nullable = false, comment = "Units of quote_currency per 1 EUR. An amount converts to EUR as amount / rate." },
+        { name = "shipping_fee_eur", type = "decimal(12,2)", nullable = false, comment = "Shipping fee charged, in Euros, including VAT." },
+      ]
+    }
+    "preprocessed/products" = {
+      layer       = "preprocessed"
+      dataset     = "products"
+      description = "Internal product catalog of the items sold."
+      partition_keys = [
+        { name = "snapshot_date", type = "date", comment = "Date the snapshot reflects. Partition column." },
+      ]
+      columns = [
+        { name = "product_id", type = "string", nullable = false, comment = "Natural key of the product." },
+        { name = "sku", type = "string", nullable = false, comment = "Stock keeping unit printed on the label." },
+        { name = "product_name", type = "string", nullable = false, comment = "Display name in the shop." },
+        { name = "brand", type = "string", nullable = false, comment = "Brand name." },
+        { name = "category_id", type = "string", nullable = false, comment = "Foreign key to categories.category_id, always a leaf category." },
+        { name = "list_price_eur", type = "decimal(12,2)", nullable = false, comment = "Current list price in EUR including German VAT. Actual charged prices are on order_items." },
+        { name = "cost_price_eur", type = "decimal(12,2)", nullable = false, comment = "Purchase cost per unit in EUR excluding VAT, used for margin." },
+        { name = "is_active", type = "boolean", nullable = false, comment = "False once the product is delisted." },
+        { name = "launched_date", type = "date", nullable = false, comment = "Date the product was first listed." },
+        { name = "valid_from", type = "date", nullable = false, comment = "Snapshot date on which this version of the product's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one." },
+        { name = "valid_to", type = "date", nullable = true, comment = "Snapshot date on which the next version was first observed. Null for the current version." },
+        { name = "product_version_id", type = "string", nullable = false, comment = "SHA256 hashed ID of the concatenation of the product_id and valid_from fields." },
+      ]
+    }
+    "preprocessed/returns" = {
+      layer       = "preprocessed"
+      dataset     = "returns"
+      description = "Event level records of returns of orders placed by customers."
+      partition_keys = [
+        { name = "update_date", type = "date", comment = "Date this status version was written (UTC). The latest version per return_id is the current one." },
+      ]
+      columns = [
+        { name = "export_date", type = "date", nullable = false, comment = "Date the record was exported. Partition column." },
+        { name = "return_id", type = "string", nullable = false, comment = "Natural key of the return." },
+        { name = "order_id", type = "string", nullable = false, comment = "Foreign key to orders.order_id." },
+        { name = "line_number", type = "int", nullable = false, comment = "With order_id, foreign key to order_items." },
+        { name = "product_id", type = "string", nullable = false, comment = "Foreign key to products.product_id; repeats the order line's product." },
+        { name = "requested_ts", type = "timestamp", nullable = false, comment = "Time the customer registered the return (UTC)." },
+        { name = "quantity_returned", type = "int", nullable = false, comment = "Units returned; at most the order line's quantity." },
+        { name = "return_reason", type = "string", nullable = false, comment = "wrong_size | damaged | not_as_described | changed_mind | other." },
+        { name = "return_status", type = "string", nullable = false, comment = "requested | received | refunded | rejected." },
+        { name = "updated_at", type = "timestamp", nullable = false, comment = "Time this status version was written (UTC). The latest version per return_id is the current one." },
+        { name = "tax_rate", type = "decimal(5,4)", nullable = true, comment = "VAT rate of the returned order line, e.g. 0.1900. Null when the order line isn't in the order_items rows read." },
+        { name = "refund_amount_eur", type = "decimal(12,2)", nullable = true, comment = "Amount refunded in Euros, including VAT. Null until return_status is refunded." },
+        { name = "net_refund_eur", type = "decimal(12,2)", nullable = true, comment = "Amount refunded in Euros, excluding VAT. Null until return_status is refunded." },
+      ]
+    }
+    "preprocessed/session_events" = {
+      layer       = "preprocessed"
+      dataset     = "session_events"
+      description = "Event level dataset of user activity."
+      partition_keys = [
+        { name = "event_date", type = "date", comment = "Date of event_ts (UTC). Partition column." },
+      ]
+      columns = [
+        { name = "event_id", type = "string", nullable = false, comment = "Client-generated unique event ID. Duplicates are retries of the same event." },
+        { name = "event_ts", type = "timestamp", nullable = false, comment = "Time the event happened on the client (UTC)." },
+        { name = "session_id", type = "string", nullable = false, comment = "Session the event belongs to; a session ends after 30 minutes of inactivity." },
+        { name = "anonymous_id", type = "string", nullable = false, comment = "Device cookie or app install ID, stable across sessions on one device." },
+        { name = "customer_id", type = "string", nullable = true, comment = "Foreign key to customers.customer_id. Set only after the visitor logs in, so it can change within a session." },
+        { name = "event_type", type = "string", nullable = false, comment = "page_view | product_view | add_to_cart | begin_checkout | purchase." },
+        { name = "product_id", type = "string", nullable = true, comment = "Foreign key to products.product_id for product_view and add_to_cart events." },
+        { name = "order_id", type = "string", nullable = true, comment = "Foreign key to orders.order_id for purchase events." },
+        { name = "utm_source", type = "string", nullable = true, comment = "utm_source of the landing URL, e.g. google, facebook, newsletter." },
+        { name = "utm_medium", type = "string", nullable = true, comment = "utm_medium of the landing URL, e.g. cpc, paid_social, email, affiliate." },
+        { name = "utm_campaign", type = "string", nullable = true, comment = "utm_campaign of the landing URL; matches marketing_spend.utm_campaign." },
+        { name = "referrer_domain", type = "string", nullable = true, comment = "Domain of the HTTP referrer. Null for direct visits and in-app navigation." },
+        { name = "device_type", type = "string", nullable = false, comment = "desktop | mobile_web | ios_app | android_app." },
+        { name = "country_code", type = "string", nullable = true, comment = "ISO 3166-1 alpha-2 country derived from the IP address." },
+        { name = "mkt_channel", type = "string", nullable = true, comment = "The marketing channel from which the customer entered the website." },
+      ]
+    }
+    "preprocessed/sessions" = {
+      layer       = "preprocessed"
+      dataset     = "sessions"
+      description = "Aggregate data source for session events."
+      partition_keys = [
+        { name = "event_date", type = "date", comment = "Date of event_ts (UTC). Partition column." },
+      ]
+      columns = [
+        { name = "session_id", type = "string", nullable = false, comment = "Session the event belongs to; a session ends after 30 minutes of inactivity." },
+        { name = "first_event_time", type = "timestamp", nullable = false, comment = "Time the first event happened on the client (UTC)." },
+        { name = "last_event_time", type = "timestamp", nullable = true, comment = "Time the last event happened on the client (UTC)." },
+        { name = "first_mkt_channel", type = "string", nullable = true, comment = "The first marketing channel from which the customer entered the website." },
+        { name = "customer_id", type = "string", nullable = false, comment = "Foreign key to customers.customer_id. Set only after the visitor logs in, so it can change within a session." },
+        { name = "last_event_type", type = "string", nullable = false, comment = "The last page type the user visited during the session." },
+        { name = "order_id", type = "string", nullable = true, comment = "Foreign key to orders.order_id for purchase events." },
+      ]
+    }
+  }
   # <<< AMEND:TABLES
   # END Hive tables
   # ---------------------------------------------------------------------------
@@ -70,11 +279,157 @@ module "glue" {
   # ---------------------------------------------------------------------------
   # BEGIN ETL jobs and triggers (managed by engineering-automation -- do not edit by hand)
   # >>> AMEND:JOBS
-  jobs = {}
+  jobs = {
+    categories = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        CATEGORIES_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/categories/"
+        CATEGORIES_LOOKBACK_DAYS = "1"
+        OUTPUT_PATH              = "s3://${module.s3.bucket_names["preprocessed"]}/category/"
+        OUTPUT_TABLE             = "${module.catalog.table_names["preprocessed/category"]}"
+        PROCESSING_TYPE          = "lookback"
+      }
+    }
+    customers = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        CUSTOMERS_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/customers/"
+        CUSTOMERS_LOOKBACK_DAYS = "14"
+        OUTPUT_PATH             = "s3://${module.s3.bucket_names["preprocessed"]}/customers/"
+        OUTPUT_TABLE            = "${module.catalog.table_names["preprocessed/customers"]}"
+        PROCESSING_TYPE         = "lookback"
+      }
+    }
+    fx_rates = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        DATES_INPUT_PATH       = "s3://${module.s3.bucket_names["raw"]}/dates/"
+        FX_RATES_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/fx_rates/"
+        FX_RATES_LOOKBACK_DAYS = "7"
+        OUTPUT_PATH            = "s3://${module.s3.bucket_names["preprocessed"]}/fx_rates/"
+        OUTPUT_TABLE           = "${module.catalog.table_names["preprocessed/fx_rates"]}"
+        PROCESSING_TYPE        = "lookback"
+      }
+    }
+    marketing_spend = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        FX_RATES_INPUT_PATH           = "s3://${module.s3.bucket_names["preprocessed"]}/fx_rates/"
+        FX_RATES_LOOKBACK_DAYS        = "1"
+        MARKETING_SPEND_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/marketing_spend/"
+        MARKETING_SPEND_LOOKBACK_DAYS = "1"
+        OUTPUT_PATH                   = "s3://${module.s3.bucket_names["preprocessed"]}/marketing_spend/"
+        OUTPUT_TABLE                  = "${module.catalog.table_names["preprocessed/marketing_spend"]}"
+        PROCESSING_TYPE               = "lookback"
+      }
+    }
+    order_items = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        ORDERS_INPUT_PATH         = "s3://${module.s3.bucket_names["preprocessed"]}/orders/"
+        ORDERS_LOOKBACK_DAYS      = "14"
+        ORDER_ITEMS_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/order_items/"
+        ORDER_ITEMS_LOOKBACK_DAYS = "14"
+        OUTPUT_PATH               = "s3://${module.s3.bucket_names["preprocessed"]}/order_items/"
+        OUTPUT_TABLE              = "${module.catalog.table_names["preprocessed/order_items"]}"
+        PROCESSING_TYPE           = "lookback"
+      }
+    }
+    orders = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        FX_RATES_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/fx_rates/"
+        FX_RATES_LOOKBACK_DAYS = "14"
+        ORDERS_INPUT_PATH      = "s3://${module.s3.bucket_names["raw"]}/orders/"
+        ORDERS_LOOKBACK_DAYS   = "14"
+        OUTPUT_PATH            = "s3://${module.s3.bucket_names["preprocessed"]}/orders/"
+        OUTPUT_TABLE           = "${module.catalog.table_names["preprocessed/orders"]}"
+        PROCESSING_TYPE        = "lookback"
+      }
+    }
+    products = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        OUTPUT_PATH            = "s3://${module.s3.bucket_names["preprocessed"]}/products/"
+        OUTPUT_TABLE           = "${module.catalog.table_names["preprocessed/products"]}"
+        PROCESSING_TYPE        = "lookback"
+        PRODUCTS_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/products/"
+        PRODUCTS_LOOKBACK_DAYS = "7"
+      }
+    }
+    returns = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        ORDER_ITEMS_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/order_items/"
+        ORDER_ITEMS_LOOKBACK_DAYS = "45"
+        OUTPUT_PATH               = "s3://${module.s3.bucket_names["preprocessed"]}/returns/"
+        OUTPUT_TABLE              = "${module.catalog.table_names["preprocessed/returns"]}"
+        PROCESSING_TYPE           = "lookback"
+        RETURNS_INPUT_PATH        = "s3://${module.s3.bucket_names["raw"]}/returns/"
+        RETURNS_LOOKBACK_DAYS     = "45"
+      }
+    }
+    session_events = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        OUTPUT_PATH                  = "s3://${module.s3.bucket_names["preprocessed"]}/session_events/"
+        OUTPUT_TABLE                 = "${module.catalog.table_names["preprocessed/session_events"]}"
+        PROCESSING_TYPE              = "lookback"
+        SESSION_EVENTS_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/session_events/"
+        SESSION_EVENTS_LOOKBACK_DAYS = "2"
+      }
+    }
+    sessions = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        OUTPUT_PATH                  = "s3://${module.s3.bucket_names["preprocessed"]}/sessions/"
+        OUTPUT_TABLE                 = "${module.catalog.table_names["preprocessed/sessions"]}"
+        PROCESSING_TYPE              = "lookback"
+        SESSION_EVENTS_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/session_events/"
+        SESSION_EVENTS_LOOKBACK_DAYS = "2"
+      }
+    }
+  }
 
   scheduled_triggers = {}
 
-  conditional_triggers = {}
+  conditional_triggers = {
+    marketing_spend = "fx_rates"
+    order_items     = "orders"
+    orders          = "fx_rates"
+    returns         = "order_items"
+    sessions        = "session_events"
+  }
   # <<< AMEND:JOBS
   # END ETL jobs and triggers
   # ---------------------------------------------------------------------------

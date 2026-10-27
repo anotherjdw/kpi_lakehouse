@@ -1,0 +1,63 @@
+# Output contract of the products ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: preprocessed
+  dataset: products
+  description: Internal product catalog of the items sold.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [ snapshot_date, product_id ]
+  schema: # include the partition column, typed date
+    - name: snapshot_date
+      type: date
+      nullable: false
+      description: "Date the snapshot reflects. Partition column."
+    - name: product_id
+      type: string
+      nullable: false
+      description: "Natural key of the product."
+    - name: sku
+      type: string
+      nullable: false
+      description: "Stock keeping unit printed on the label."
+    - name: product_name
+      type: string
+      nullable: false
+      description: "Display name in the shop."
+    - name: brand
+      type: string
+      nullable: false
+      description: "Brand name."
+    - name: category_id
+      type: string
+      nullable: false
+      description: "Foreign key to categories.category_id, always a leaf category."
+    - name: list_price_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Current list price in EUR including German VAT. Actual charged prices are on order_items."
+    - name: cost_price_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Purchase cost per unit in EUR excluding VAT, used for margin."
+    - name: is_active
+      type: boolean
+      nullable: false
+      description: "False once the product is delisted."
+    - name: launched_date
+      type: date
+      nullable: false
+      description: "Date the product was first listed."
+    - name: valid_from
+      type: date
+      nullable: false
+      description: "Snapshot date on which this version of the product's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one."
+    - name: valid_to
+      type: date
+      nullable: true
+      description: "Snapshot date on which the next version was first observed. Null for the current version."
+    - name: product_version_id
+      type: string
+      nullable: false
+      description: "SHA256 hashed ID of the concatenation of the product_id and valid_from fields."

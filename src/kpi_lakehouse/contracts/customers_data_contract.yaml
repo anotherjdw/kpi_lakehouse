@@ -1,0 +1,67 @@
+# Output contract of the customers ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: preprocessed
+  dataset: customers
+  description: Versioned customer data.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [ snapshot_date, customer_id ]
+  schema: # include the partition column, typed date
+    - name: snapshot_date
+      type: date
+      nullable: false
+      description: "Date the snapshot reflects. Partition column."
+    - name: customer_id
+      type: string
+      nullable: false
+      description: "Natural key of the customer. Kept after erasure."
+    - name: email
+      type: string
+      nullable: true
+      classification: pii
+      description: "SHA256 hashed value of customer email address. Null after erasure."
+    - name: signup_ts
+      type: timestamp
+      nullable: false
+      description: "Time the account was created (UTC)."
+    - name: country_code
+      type: string
+      nullable: true
+      description: "ISO 3166-1 alpha-2 country of the default address. Null after erasure."
+    - name: postal_code
+      type: string
+      nullable: true
+      classification: pii
+      description: "Postal code of the default address. Null after erasure."
+    - name: customer_segment
+      type: string
+      nullable: false
+      description: "standard | plus (paid membership) | business. Can change over time."
+    - name: marketing_opt_in
+      type: boolean
+      nullable: false
+      description: "Whether the customer consents to marketing email. Can change over time."
+    - name: is_deleted
+      type: boolean
+      nullable: false
+      description: "True once the customer requested erasure under GDPR Art. 17."
+    - name: valid_from
+      type: date
+      nullable: false
+      description: "Snapshot date on which this version of the customer's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one."
+    - name: valid_to
+      type: date
+      nullable: true
+      description: "Snapshot date on which the next version was first observed. Null for the current version."
+    - name: customer_version_id
+      type: string
+      nullable: false
+      description: "SHA256 hashed ID of the concatenation of the customer_id and valid_from fields."
+    - name: birth_year
+      type: int
+      nullable: true
+      classification: pii
+      description: "Year of birth, optional at signup. Null after erasure."
+

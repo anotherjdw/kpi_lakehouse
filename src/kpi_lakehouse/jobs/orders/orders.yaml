@@ -1,0 +1,75 @@
+# Job spec for the orders ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/orders/ and its tests:
+# tests/unit/orders/, tests/integration/test_orders_integration.py,
+# tests/end_to_end/test_orders_e2e.py and tests/fixtures/orders/.
+job:
+  name: orders
+  description: Filters ingested order data to yield the latest status of each order, and converts shipping fee to Euros.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - contract: orders_raw # cannot share same name as downstream
+      # job: <job name>   # instead of contract, to read another job's output; create that job first
+      alias: orders
+      allow_empty: false  # true lets this source read no rows without failing the run
+      # The dates this source reads, if it is partitioned by date; an unpartitioned source sets none.
+      lookback_days: 14    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      # start_date: 2026-01-01   # YYYY-MM-DD; set both dates when type is backfill, neither for lookback
+      # end_date: 2026-01-01     # backfill processes every day from start_date to end_date
+    - job: fx_rates
+      alias: fx_rates
+      allow_empty: false
+      lookback_days: 14
+  sink:
+    contract: orders   # the output contract: contracts/orders_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: order_date
+  transformations:
+    - name: create order date
+      description: >
+        Create an order_date column by extracting the date from order_ts.
+      # inputs: the DataFrames this transformation takes, in order; each becomes a parameter.
+      # An input is a source alias, or the name of another transformation to take its output.
+      # Names are written as `name:` is: lower case, spaces and hyphens become underscores.
+      inputs: [orders]
+      # depends_on: every transformation named in inputs. transform() calls each of them before
+      # this one, so their output exists when this one is called. Leave out source aliases:
+      # read() loads every source before any transformation is called.
+      # depends_on: [<transformation name>]
+      # output: the result has its inputs' columns, minus removes_columns, plus columns; the
+      # description is not read for this. To rename a column, list its old name under
+      # removes_columns and its new name, with its type, under columns.
+      output:
+        grain_change: false
+        columns:            # columns this transformation adds; delete the block if none
+          - name: order_date
+            type: date
+        # removes_columns: [<column this transformation drops>]
+    - name: keep latest status
+      description: Keep the row with the latest `updated_at` per `order_id`. Read with a 14-day lookback so status changes exported days later replace earlier versions. Filter out test orders and drop is_test_order.
+      inputs: [create order date]
+      depends_on: [create order date]
+      output:
+        grain_change: false
+        removes_columns: [is_test_order]
+    - name: join fx rates
+      description: left joins fx_rates data to order data on `order_date=rate_date` and `quote_currency=currency_code`.
+      inputs: [fx_rates, keep latest status]
+      depends_on: [keep latest status]
+      output:
+        grain_change: false
+    - name: convert shipping fee
+      description: create shipping_fee_eur by dividing shipping_fee by rate.
+      inputs: [join fx rates]
+      depends_on: [join fx rates]
+      output:
+        grain_change: false
+        removes_columns: [shipping_fee]
+        columns:
+          - name: shipping_fee_eur
+            type: decimal(12,2)

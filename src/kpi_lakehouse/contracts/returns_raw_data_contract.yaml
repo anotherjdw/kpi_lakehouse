@@ -1,0 +1,66 @@
+# Source contract returns_raw: data no job in this project writes. Describe the files exactly as
+# they are on disk. Generation-time input; never deployed.
+contract:
+  layer: raw                  # raw | preprocessed | processed
+  dataset: returns
+  file_format: json
+  partition_key: export_date
+  description: >
+    Return records per order line from the warehouse management system, exported each time a
+    return changes status. Customers have 30 days after delivery to return, so a return can
+    first appear up to about 45 days after the order was placed.
+  owner: Warehouse management system
+  classification:
+    contains_pii: false
+  freshness:
+    cadence: daily
+    max_lateness: 45 days after the order
+  grain:
+    unique_key: [return_id, updated_at]
+  schema:                     # include the partition column, typed date
+    - name: export_date
+      type: date
+      nullable: false
+      description: "Date the record was exported. Partition column."
+    - name: return_id
+      type: string
+      nullable: false
+      description: "Natural key of the return."
+    - name: order_id
+      type: string
+      nullable: false
+      description: "Foreign key to orders.order_id."
+    - name: line_number
+      type: int
+      nullable: false
+      description: "With order_id, foreign key to order_items."
+    - name: product_id
+      type: string
+      nullable: false
+      description: "Foreign key to products.product_id; repeats the order line's product."
+    - name: requested_ts
+      type: timestamp
+      nullable: false
+      description: "Time the customer registered the return (UTC)."
+    - name: quantity_returned
+      type: int
+      nullable: false
+      description: "Units returned; at most the order line's quantity."
+      constraints:
+        min: 1
+    - name: refund_amount
+      type: decimal(12,2)
+      nullable: true
+      description: "Amount refunded in the order's currency, including VAT. Null until return_status is refunded."
+    - name: return_reason
+      type: string
+      nullable: false
+      description: "wrong_size | damaged | not_as_described | changed_mind | other."
+    - name: return_status
+      type: string
+      nullable: false
+      description: "requested | received | refunded | rejected."
+    - name: updated_at
+      type: timestamp
+      nullable: false
+      description: "Time this status version was written (UTC). The latest version per return_id is the current one."

@@ -1,0 +1,70 @@
+# Job spec for the returns ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/returns/ and its tests:
+# tests/unit/returns/, tests/integration/test_returns_integration.py,
+# tests/end_to_end/test_returns_e2e.py and tests/fixtures/returns/.
+job:
+  name: returns
+  description: Event level records of returns of orders placed by customers.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - contract: returns_raw
+      alias: returns
+      allow_empty: false  # true lets this source read no rows without failing the run
+      lookback_days: 45    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+    - job: order_items
+      alias: order_items
+      allow_empty: false
+      lookback_days: 45
+  sink:
+    contract: returns   # the output contract: contracts/returns_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: update_date
+  transformations:
+    - name: create updated_date column
+      description: >
+        Extract the date from the updated_at timestamp.
+      inputs: [returns]
+      output:
+        grain_change: false
+        columns:            # columns this transformation adds; delete the block if none
+          - name: update_date
+            type: date
+            nullable: false
+    - name: keep latest status
+      description: First, keep the latest updated_at per return_id with a 45 day lookback. Then, keep return that are requested, received or refunded, and filtered out rejected returns.
+      inputs: [create updated_date column]
+      depends_on: [create updated_date column]
+      output:
+        grain_change: false
+    - name: join order items data
+      description: select order_id, line_number, rate, and tax_rate from order_items, and left join order_items to returns on order_id and line_number. Keep all returns, including any without a matching order item.
+      inputs: [keep latest status, order_items]
+      depends_on: [keep latest status]
+      output:
+        grain_change: false
+        removes_columns: [order_date, quantity, unit_price, discount_amount, gross_amount_eur, net_amount_eur]
+    - name: convert refund amount
+      description:  Create a refund_amount_eur column by dividing refund_amounts by rate.
+      inputs: [join order items data]
+      depends_on: [join order items data]
+      output:
+        grain_change: false
+        removes_columns: [refund_amount, rate]
+        columns:
+          - name: refund_amount_eur
+            type: decimal(12,2)
+    - name: compute net refund
+      description: Create a net_refund_eur column by multiply refund_amount_eur by (1 + tax_rate).
+      inputs: [convert refund amount]
+      depends_on: [convert refund amount]
+      output:
+        grain_change: false
+        columns:
+          - name: net_refund_eur
+            type: decimal(12,2)

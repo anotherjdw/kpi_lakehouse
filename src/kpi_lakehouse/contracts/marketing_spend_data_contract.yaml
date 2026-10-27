@@ -1,0 +1,62 @@
+# Output contract of the marketing_spend ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: preprocessed
+  dataset: marketing_spend
+  description: >
+    Daily spend per campaign pulled from the advertising platforms' reporting APIs. Platforms
+    restate the last three days as late clicks and invalid traffic are settled, so a
+    spend_date and campaign can be reported several times; the latest reported_at wins.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [ spend_date, platform, campaign_id, reported_at ]
+  schema: # include the partition column, typed date
+    - name: spend_date
+      type: date
+      nullable: false
+      description: "Date the spend was incurred, in the platform's account time zone. Partition column."
+    - name: platform
+      type: string
+      nullable: false
+      description: "google_ads | meta | tiktok | affiliate_network | newsletter_tool."
+    - name: campaign_id
+      type: string
+      nullable: false
+      description: "Campaign ID within the platform."
+    - name: campaign_name
+      type: string
+      nullable: false
+      description: "Campaign name as set in the platform."
+    - name: utm_source
+      type: string
+      nullable: true
+      description: "utm_source the campaign's links carry."
+    - name: utm_medium
+      type: string
+      nullable: true
+      description: "utm_medium the campaign's links carry."
+    - name: utm_campaign
+      type: string
+      nullable: true
+      description: "utm_campaign the campaign's links carry; joins spend to sessions."
+    - name: impressions
+      type: bigint
+      nullable: false
+      description: "Ad impressions reported for the day."
+    - name: clicks
+      type: bigint
+      nullable: false
+      description: "Ad clicks reported for the day."
+    - name: spend_amount_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Spend for the day in Euros, excluding VAT."
+    - name: currency_code
+      type: string
+      nullable: false
+      description: "ISO 4217 currency of the platform account."
+    - name: reported_at
+      type: timestamp
+      nullable: false
+      description: "Time the platform reported this figure (UTC). Later reports replace earlier ones."

@@ -1,0 +1,43 @@
+# Source contract categories_raw: data no job in this project writes. Describe the files exactly
+# as they are on disk. Generation-time input; never deployed.
+contract:
+  layer: raw                  # raw | preprocessed | processed
+  dataset: categories
+  file_format: json
+  partition_key: snapshot_date
+  description: >
+    Full export of the category tree as parent/child pairs, overwritten on every export. The tree
+    is up to four levels deep; root categories have no parent.
+  owner: Product information management (PIM)
+  classification:
+    contains_pii: false
+  freshness:
+    cadence: daily
+    max_lateness: 1 day
+  grain:
+    unique_key: [category_id]
+  schema:
+    - name: snapshot_date
+      type: date
+      nullable: false
+      description: "Date the snapshot reflects. Partition column."
+    - name: category_id
+      type: string
+      nullable: false
+      description: "Natural key of the category."
+    - name: category_name
+      type: string
+      nullable: false
+      description: "Display name, e.g. Running Shoes."
+    - name: parent_category_id
+      type: string
+      nullable: true
+      description: "category_id of the parent. Null for a root category."
+    - name: is_active
+      type: boolean
+      nullable: false
+      description: "False once the category is retired; retired categories stay for history."
+    - name: updated_at
+      type: timestamp
+      nullable: false
+      description: "Time the category was last changed (UTC)."

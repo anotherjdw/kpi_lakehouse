@@ -1,0 +1,78 @@
+# Source contract customers_raw: data no job in this project writes. Describe the files exactly
+# as they are on disk. Generation-time input; never deployed.
+contract:
+  layer: raw                  # raw | preprocessed | processed
+  dataset: customers
+  file_format: json
+  partition_key: snapshot_date
+  description: >
+    Daily full snapshot of the customer master from the CRM. Attribute changes are visible only
+    by comparing consecutive snapshots. After a GDPR erasure request, is_deleted is true and
+    every personal field is null in that and all later snapshots.
+  owner: CRM
+  classification:
+    contains_pii: true
+  freshness:
+    cadence: daily
+    max_lateness: 1 day
+  grain:
+    unique_key: [snapshot_date, customer_id]
+  schema:                     # include the partition column, typed date
+    - name: snapshot_date
+      type: date
+      nullable: false
+      description: "Date the snapshot reflects. Partition column."
+    - name: customer_id
+      type: string
+      nullable: false
+      description: "Natural key of the customer. Kept after erasure."
+    - name: email
+      type: string
+      nullable: true
+      classification: pii
+      description: "Login email address. Null after erasure."
+    - name: first_name
+      type: string
+      nullable: true
+      classification: pii
+      description: "First name. Null after erasure."
+    - name: last_name
+      type: string
+      nullable: true
+      classification: pii
+      description: "Last name. Null after erasure."
+    - name: date_of_birth
+      type: date
+      nullable: true
+      classification: pii
+      description: "Date of birth, optional at signup. Null after erasure."
+    - name: signup_ts
+      type: timestamp
+      nullable: false
+      description: "Time the account was created (UTC)."
+    - name: country_code
+      type: string
+      nullable: true
+      description: "ISO 3166-1 alpha-2 country of the default address. Null after erasure."
+    - name: city
+      type: string
+      nullable: true
+      classification: pii
+      description: "City of the default address. Null after erasure."
+    - name: postal_code
+      type: string
+      nullable: true
+      classification: pii
+      description: "Postal code of the default address. Null after erasure."
+    - name: customer_segment
+      type: string
+      nullable: false
+      description: "standard | plus (paid membership) | business. Can change over time."
+    - name: marketing_opt_in
+      type: boolean
+      nullable: false
+      description: "Whether the customer consents to marketing email. Can change over time."
+    - name: is_deleted
+      type: boolean
+      nullable: false
+      description: "True once the customer requested erasure under GDPR Art. 17."

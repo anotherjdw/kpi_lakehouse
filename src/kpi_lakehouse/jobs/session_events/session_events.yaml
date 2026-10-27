@@ -1,0 +1,41 @@
+# Job spec for the session_events ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/session_events/ and its tests:
+# tests/unit/session_events/, tests/integration/test_session_events_integration.py,
+# tests/end_to_end/test_session_events_e2e.py and tests/fixtures/session_events/.
+job:
+  name: session_events
+  description: Event level dataset of user activity.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - contract: session_events_raw
+      # job: <job name>   # instead of contract, to read another job's output; create that job first
+      alias: session_events
+      allow_empty: false  # true lets this source read no rows without failing the run
+      lookback_days: 2
+  sink:
+    contract: session_events   # the output contract: contracts/session_events_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: event_date
+  transformations:
+    - name: deduplicate session data
+      description: >
+        Order the data by event_id and event_ts descending. Keep one row per event_id.
+      inputs: [session_events]
+      output:
+        grain_change: false
+    - name: derive marketing channel
+      description: >
+        Classify each event from utm_source/utm_medium, falling back to referrer_domain when UTMs are missing, into the following marketing channels: paid_search, paid_social, affiliate, email, organic_search, referral or direct. marketing_spend uses the same rules, so spend and sessions share one channel key.
+      inputs: [deduplicate session data]
+      depends_on: [deduplicate session data]
+      output:
+        grain_change: false
+        columns:
+          - name: mkt_channel
+            type: string

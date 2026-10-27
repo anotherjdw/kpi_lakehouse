@@ -1,0 +1,35 @@
+# Source contract fx_rates_raw: data no job in this project writes. Describe the files exactly as
+# they are on disk. Generation-time input; never deployed.
+contract:
+  layer: raw                  # raw | preprocessed | processed
+  dataset: fx_rates
+  file_format: json
+  partition_key: rate_date
+  description: >
+    Euro foreign exchange reference rates published by the European Central Bank. Rates exist only
+    for TARGET business days, so weekends and holidays have no partition.
+  owner: European Central Bank (public feed)
+  classification:
+    contains_pii: false
+  freshness:
+    cadence: business days, around 16:00 CET
+    max_lateness: 1 day
+  grain:
+    unique_key: [rate_date, quote_currency]
+  schema:                     # include the partition column, typed date
+    - name: rate_date
+      type: date
+      nullable: false
+      description: "Date the rate was published. Partition column."
+    - name: base_currency
+      type: string
+      nullable: false
+      description: "Always EUR."
+    - name: quote_currency
+      type: string
+      nullable: false
+      description: "ISO 4217 currency quoted, e.g. CHF, PLN, SEK, DKK. EUR itself is not listed."
+    - name: rate
+      type: decimal(18,8)
+      nullable: false
+      description: "Units of quote_currency per 1 EUR. An amount converts to EUR as amount / rate."

@@ -1,0 +1,43 @@
+# Output contract of the sessions ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: preprocessed
+  dataset: sessions
+  description: Aggregate data source for session events.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [session_id, event_date]    # checked for duplicates on every write
+  schema:
+    - name: session_id
+      type: string
+      nullable: false
+      description: "Session the event belongs to; a session ends after 30 minutes of inactivity."
+    - name: event_date
+      type: date
+      nullable: false
+      description: "Date of event_ts (UTC). Partition column."
+    - name: first_event_time
+      type: timestamp
+      nullable: false
+      description: "Time the first event happened on the client (UTC)."
+    - name: last_event_time
+      type: timestamp
+      nullable: true
+      description: "Time the last event happened on the client (UTC)."
+    - name: first_mkt_channel
+      type: string
+      nullable: true
+      description: "The first marketing channel from which the customer entered the website."
+    - name: customer_id
+      type: string
+      nullable: false
+      description: "Foreign key to customers.customer_id. Set only after the visitor logs in, so it can change within a session."
+    - name: last_event_type
+      type: string
+      nullable: false
+      description: "The last page type the user visited during the session."
+    - name: order_id
+      type: string
+      nullable: true
+      description: "Foreign key to orders.order_id for purchase events."

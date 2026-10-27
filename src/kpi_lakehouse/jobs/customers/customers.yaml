@@ -1,0 +1,107 @@
+# Job spec for the customers ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/customers/ and its tests:
+# tests/unit/customers/, tests/integration/test_customers_integration.py,
+# tests/end_to_end/test_customers_e2e.py and tests/fixtures/customers/.
+job:
+  name: customers
+  description: Versioned customer data.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - contract: customers_raw
+      # job: <job name>   # instead of contract, to read another job's output; create that job first
+      alias: customers
+      allow_empty: false  # true lets this source read no rows without failing the run
+      # The dates this source reads, if it is partitioned by date; an unpartitioned source sets none.
+      lookback_days: 14    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      # start_date: 2026-01-01   # YYYY-MM-DD; set both dates when type is backfill, neither for lookback
+      # end_date: 2026-01-01     # backfill processes every day from start_date to end_date
+  sink:
+    contract: customers   # the output contract: contracts/customers_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: snapshot_date
+  transformations:
+    - name: create tracked columns
+      description: >
+        is_version_start = not F.struct(tracked).eqNullSafe(its F.lag over a window by customer_id ordered by snapshot_date), so null to value is a change and each customer's first row is true. tracked: customer_segment, country_code, marketing_opt_in
+      inputs: [customers]
+      output:
+        grain_change: false
+        columns:            # columns this transformation adds; delete the block if none
+          - name: is_version_start
+            type: boolean
+            nullable: false
+    - name: filter version starts
+      description: filter the DataFrame to keep rows `is_version_start` is true, then drop the `is_version_start` column.
+      inputs: [create tracked columns]
+      depends_on: [create tracked columns]
+      output:
+        grain_change: false
+        removes_columns: [is_version_start]
+    - name: add validity window
+      description: Create a valid_from column, where valid_from = snapshot_date. Create a valid_to column, where valid_to = F.lead('snapshot_date') over a window partitioned by customer_id and ordered by snapshot_date.
+      inputs: [filter version starts]
+      depends_on: [filter version starts]
+      output:
+        grain_change: false
+        columns:
+          - name: valid_from
+            type: date
+            nullable: false
+          - name: valid_to
+            type: date
+            nullable: true
+    - name: create customer version id
+      description: Create an SHA256 hashed column called customer_version_id, which takes a concatenation customer_id and valid_from.
+      inputs: [add validity window]
+      depends_on: [add validity window]
+      output:
+        grain_change: false
+        columns:
+          - name: customer_version_id
+            type: string
+    - name: pseudonymise email data
+      description: replace the values of the email column with an SHA256 hashed value of the email column.
+      inputs: [create customer version id]
+      depends_on: [create customer version id]
+      output:
+        grain_change: false
+    - name: drop pii columns
+      description: drop the city, first_name, last_name columns
+      inputs: [pseudonymise email data]
+      depends_on: [pseudonymise email data]
+      output:
+        grain_change: false
+        removes_columns: [city, first_name, last_name]
+    - name: create birth year
+      description: extract the year from the date_of_birth column, and drop the date_of_birth column.
+      inputs: [drop pii columns]
+      depends_on: [drop pii columns]
+      output:
+        grain_change: false
+        removes_columns: [date_of_birth]
+        columns:
+          - name: birth_year
+            type: int
+    - name: shorten postal code
+      description: shorten the values of the postal_code column to the first two characters.
+      inputs: [create birth year]
+      depends_on: [create birth year]
+      output:
+        grain_change: false
+    - name: remove deleted customer records
+      description: >-
+        Find the customer_ids whose row with valid_to null has is_deleted true. On every row of
+        those customers, all versions included, set email, postal_code, birth_year and
+        country_code to null. Leave every other column unchanged on every row, values exactly as
+        they are: signup_ts keeps its milliseconds, and customer_segment, marketing_opt_in and
+        is_deleted are not nulled. Rows of other customers are returned unchanged.
+      inputs: [shorten postal code]
+      depends_on: [shorten postal code]
+      output:
+        grain_change: false

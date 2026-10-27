@@ -1,0 +1,40 @@
+# Job spec for the categories ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/categories/ and its tests:
+# tests/unit/categories/, tests/integration/test_categories_integration.py,
+# tests/end_to_end/test_categories_e2e.py and tests/fixtures/categories/.
+job:
+  name: categories
+  description: Internal flattened catalog of product categories.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - contract: categories_raw
+      alias: categories
+      allow_empty: false  # true lets this source read no rows without failing the run
+      lookback_days: 1    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+  sink:
+    contract: categories   # the output contract: contracts/categories_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: snapshot_date
+  transformations:
+    - name: flatten category tree
+      description: >
+        Resolve each category_id's path from the root down to the category itself by repeated self-joins on parent_category_id (at most four levels). category_id_level_N is the category_id at depth N of that path: level_1 is the root, and the category's own category_id fills the level at its depth, so a root has only level_1. Levels deeper than the category are null. Fail the run if a parent is missing or the tree contains a cycle.
+      inputs: [categories]
+      output:
+        grain_change: false
+        columns:            # columns this transformation adds; delete the block if none
+          - name: category_id_level_1
+            type: string
+          - name: category_id_level_2
+            type: string
+          - name: category_id_level_3
+            type: string
+          - name: category_id_level_4
+            type: string
+        # removes_columns: [<column this transformation drops>]

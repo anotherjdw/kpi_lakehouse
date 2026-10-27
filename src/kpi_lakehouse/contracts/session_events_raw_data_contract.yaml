@@ -1,0 +1,80 @@
+# Source contract session_events_raw: data no job in this project writes. Describe the files
+# exactly as they are on disk. Generation-time input; never deployed.
+contract:
+  layer: raw                  # raw | preprocessed | processed
+  dataset: session_events
+  file_format: parquet
+  partition_key: event_date
+  description: >
+    Web and app clickstream from the tracking collector, one row per event. Clients buffer events
+    offline, so events can land up to two days after event_date, and retries can write the same
+    event_id twice.
+  owner: Tracking collector
+  classification:
+    contains_pii: false
+  freshness:
+    cadence: hourly
+    max_lateness: 2 days
+  grain:
+    unique_key: [event_id]
+  schema:                     # include the partition column, typed date
+    - name: event_date
+      type: date
+      nullable: false
+      description: "Date of event_ts (UTC). Partition column."
+    - name: event_id
+      type: string
+      nullable: false
+      description: "Client-generated unique event ID. Duplicates are retries of the same event."
+    - name: event_ts
+      type: timestamp
+      nullable: false
+      description: "Time the event happened on the client (UTC)."
+    - name: session_id
+      type: string
+      nullable: false
+      description: "Session the event belongs to; a session ends after 30 minutes of inactivity."
+    - name: anonymous_id
+      type: string
+      nullable: false
+      description: "Device cookie or app install ID, stable across sessions on one device."
+    - name: customer_id
+      type: string
+      nullable: true
+      description: "Foreign key to customers.customer_id. Set only after the visitor logs in, so it can change within a session."
+    - name: event_type
+      type: string
+      nullable: false
+      description: "page_view | product_view | add_to_cart | begin_checkout | purchase."
+    - name: product_id
+      type: string
+      nullable: true
+      description: "Foreign key to products.product_id for product_view and add_to_cart events."
+    - name: order_id
+      type: string
+      nullable: true
+      description: "Foreign key to orders.order_id for purchase events."
+    - name: utm_source
+      type: string
+      nullable: true
+      description: "utm_source of the landing URL, e.g. google, facebook, newsletter."
+    - name: utm_medium
+      type: string
+      nullable: true
+      description: "utm_medium of the landing URL, e.g. cpc, paid_social, email, affiliate."
+    - name: utm_campaign
+      type: string
+      nullable: true
+      description: "utm_campaign of the landing URL; matches marketing_spend.utm_campaign."
+    - name: referrer_domain
+      type: string
+      nullable: true
+      description: "Domain of the HTTP referrer. Null for direct visits and in-app navigation."
+    - name: device_type
+      type: string
+      nullable: false
+      description: "desktop | mobile_web | ios_app | android_app."
+    - name: country_code
+      type: string
+      nullable: true
+      description: "ISO 3166-1 alpha-2 country derived from the IP address."

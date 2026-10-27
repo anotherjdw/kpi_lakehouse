@@ -1,0 +1,66 @@
+# Job spec for the fx_rates ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/fx_rates/ and its tests:
+# tests/unit/fx_rates/, tests/integration/test_fx_rates_integration.py,
+# tests/end_to_end/test_fx_rates_e2e.py and tests/fixtures/fx_rates/.
+job:
+  name: fx_rates
+  description: Provides currency rates to enable conversion of fees and prices to Euros.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - contract: fx_rates_raw
+      # job: <job name>   # instead of contract, to read another job's output; create that job first
+      alias: fx_rates
+      allow_empty: false  # true lets this source read no rows without failing the run
+      # The dates this source reads, if it is partitioned by date; an unpartitioned source sets none.
+      lookback_days: 7    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      # start_date: 2026-01-01   # YYYY-MM-DD; set both dates when type is backfill, neither for lookback
+      # end_date: 2026-01-01     # backfill processes every day from start_date to end_date
+    - contract: dates
+      alias: dates
+      allow_empty: false
+  sink:
+    contract: fx_rates   # the output contract: contracts/fx_rates_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: rate_date
+  transformations:
+    - name: join fx rates to date
+      description: >
+        Left join the fx rates data to the date spine, dates.date == fx_rates.rate_date.
+      # inputs: the DataFrames this transformation takes, in order; each becomes a parameter.
+      # An input is a source alias, or the name of another transformation to take its output.
+      # Names are written as `name:` is: lower case, spaces and hyphens become underscores.
+      inputs: [fx_rates, dates]
+      # depends_on: every transformation named in inputs. transform() calls each of them before
+      # this one, so their output exists when this one is called. Leave out source aliases:
+      # read() loads every source before any transformation is called.
+      # depends_on: [<transformation name>]
+      # output: the result has its inputs' columns, minus removes_columns, plus columns; the
+      # description is not read for this. To rename a column, list its old name under
+      # removes_columns and its new name, with its type, under columns.
+      output:
+        grain_change: false
+    - name: fill weekends and holidays
+      description: >-
+        One row per date and currency. Weekend and holiday dates come out of the join as one
+        all-null row, so cross join every date with every distinct quote_currency (base_currency
+        EUR) and left join the published rates back on date and quote_currency. Per
+        quote_currency, ordered by date, carry the last non-null rate forward. Carry only rate:
+        filled rows keep rate_date null. Add an EUR row per date with quote_currency EUR, rate
+        1.0 and rate_date null, so EUR amounts convert through the same join.
+      inputs: [join fx rates to date]
+      depends_on: [join fx rates to date]
+      output:
+        grain_change: false
+    - name: coalesce rate_date
+      description: coalesce rate_date and date columns, in that order and assign to rate_date. Drop date column
+      inputs: [fill weekends and holidays]
+      depends_on: [fill weekends and holidays]
+      output:
+        grain_change: false
+        removes_columns: [date]
