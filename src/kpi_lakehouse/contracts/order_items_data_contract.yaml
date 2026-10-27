@@ -57,4 +57,3 @@ contract:
       type: decimal(12,2)
       nullable: false
       description: "Price charged for all units purchased in Euros, excluding VAT, after discount."
-

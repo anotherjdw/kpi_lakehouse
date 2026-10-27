@@ -9,4 +9,3 @@ contract:
     - name: date
       type: date
       nullable: false
-

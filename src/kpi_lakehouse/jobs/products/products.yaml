@@ -61,4 +61,3 @@ job:
         columns:
           - name: product_version_id
             type: string
-

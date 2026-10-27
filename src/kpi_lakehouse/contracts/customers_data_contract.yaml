@@ -64,4 +64,3 @@ contract:
       nullable: true
       classification: pii
       description: "Year of birth, optional at signup. Null after erasure."
-

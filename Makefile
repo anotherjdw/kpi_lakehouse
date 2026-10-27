@@ -1,4 +1,4 @@
-.PHONY: install test test-unit test-integration test-e2e lint format typecheck check fmt plan package clean
+.PHONY: install test test-unit test-integration test-e2e lint format typecheck check fmt plan package clean precommit
 
 # Glue 5.0 runs Python 3.11; every target uses the tools in .venv, built from it.
 PYTHON := python3.11
@@ -31,7 +31,10 @@ format:
 typecheck:
 	$(BIN)/mypy src/
 
-check: lint typecheck test
+precommit:
+	PATH="$(CURDIR)/$(BIN):$$PATH" $(BIN)/pre-commit run --all-files
+
+check: precommit test
 
 fmt:
 	terraform fmt -recursive infra/terraform/
