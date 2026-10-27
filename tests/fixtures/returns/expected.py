@@ -262,6 +262,6 @@ COMPUTE_NET_REFUND_ROWS: list[Row] = [
         updated_at=datetime(2026, 10, 25, 11, 3, 29, 146000),
         tax_rate=Decimal("0.0810"),
         refund_amount_eur=Decimal("25.72"),
-        net_refund_eur=Decimal("27.80"),
+        net_refund_eur=Decimal("23.79"),
     ),
 ]

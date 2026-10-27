@@ -54,7 +54,6 @@ customers_schema = StructType(
         StructField("marketing_opt_in", BooleanType(), nullable=False),
         StructField("is_deleted", BooleanType(), nullable=False),
         StructField("valid_from", DateType(), nullable=False),
-        StructField("valid_to", DateType(), nullable=True),
         StructField("customer_version_id", StringType(), nullable=False),
         StructField("birth_year", IntegerType(), nullable=True),
     ]
@@ -218,7 +217,6 @@ products_schema = StructType(
         StructField("is_active", BooleanType(), nullable=False),
         StructField("launched_date", DateType(), nullable=False),
         StructField("valid_from", DateType(), nullable=False),
-        StructField("valid_to", DateType(), nullable=True),
         StructField("product_version_id", StringType(), nullable=False),
     ]
 )

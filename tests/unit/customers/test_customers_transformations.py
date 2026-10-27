@@ -84,7 +84,6 @@ ADD_VALIDITY_WINDOW_SCHEMA = StructType(
         StructField("marketing_opt_in", BooleanType(), nullable=True),
         StructField("is_deleted", BooleanType(), nullable=True),
         StructField("valid_from", DateType(), nullable=True),
-        StructField("valid_to", DateType(), nullable=True),
     ]
 )
 
@@ -104,7 +103,6 @@ CREATE_CUSTOMER_VERSION_ID_SCHEMA = StructType(
         StructField("marketing_opt_in", BooleanType(), nullable=True),
         StructField("is_deleted", BooleanType(), nullable=True),
         StructField("valid_from", DateType(), nullable=True),
-        StructField("valid_to", DateType(), nullable=True),
         StructField("customer_version_id", StringType(), nullable=True),
     ]
 )
@@ -125,7 +123,6 @@ PSEUDONYMISE_EMAIL_DATA_SCHEMA = StructType(
         StructField("marketing_opt_in", BooleanType(), nullable=True),
         StructField("is_deleted", BooleanType(), nullable=True),
         StructField("valid_from", DateType(), nullable=True),
-        StructField("valid_to", DateType(), nullable=True),
         StructField("customer_version_id", StringType(), nullable=True),
     ]
 )
@@ -143,7 +140,6 @@ DROP_PII_COLUMNS_SCHEMA = StructType(
         StructField("marketing_opt_in", BooleanType(), nullable=True),
         StructField("is_deleted", BooleanType(), nullable=True),
         StructField("valid_from", DateType(), nullable=True),
-        StructField("valid_to", DateType(), nullable=True),
         StructField("customer_version_id", StringType(), nullable=True),
     ]
 )
@@ -160,7 +156,6 @@ CREATE_BIRTH_YEAR_SCHEMA = StructType(
         StructField("marketing_opt_in", BooleanType(), nullable=True),
         StructField("is_deleted", BooleanType(), nullable=True),
         StructField("valid_from", DateType(), nullable=True),
-        StructField("valid_to", DateType(), nullable=True),
         StructField("customer_version_id", StringType(), nullable=True),
         StructField("birth_year", IntegerType(), nullable=True),
     ]
@@ -178,7 +173,6 @@ SHORTEN_POSTAL_CODE_SCHEMA = StructType(
         StructField("marketing_opt_in", BooleanType(), nullable=True),
         StructField("is_deleted", BooleanType(), nullable=True),
         StructField("valid_from", DateType(), nullable=True),
-        StructField("valid_to", DateType(), nullable=True),
         StructField("customer_version_id", StringType(), nullable=True),
         StructField("birth_year", IntegerType(), nullable=True),
     ]

@@ -17,7 +17,7 @@ job:
       # job: <job name>   # instead of contract, to read another job's output; create that job first
       alias: products
       allow_empty: false  # true lets this source read no rows without failing the run
-      lookback_days: 7    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      lookback_days: 2    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
   sink:
     contract: products   # the output contract: contracts/products_data_contract.yaml
     write_mode: overwrite     # the only mode: replaces the partitions present in the output
@@ -33,14 +33,14 @@ job:
           - name: is_version_start
             type: boolean
     - name: filter version starts
-      description: filter the DataFrame to keep rows `is_version_start` is true, then drop the `is_version_start` column.
+      description: filter the DataFrame to keep rows `is_version_start` is true, then drop the `is_version_start` column. Rows on the earliest snapshot_date in the DataFrame are only the comparison for the next day - drop them, unless the DataFrame contains a single snapshot_date.
       inputs: [ create tracked columns ]
       depends_on: [ create tracked columns ]
       output:
         grain_change: false
         removes_columns: [ is_version_start ]
     - name: add validity window
-      description: Create a valid_from column, where valid_from = snapshot_date. Create a valid_to column, where valid_to = F.lead('snapshot_date') over a window partitioned by product_id and ordered by snapshot_date.
+      description: Create a valid_from column, where valid_from = snapshot_date.
       inputs: [ filter version starts ]
       depends_on: [ filter version starts ]
       output:
@@ -49,9 +49,6 @@ job:
           - name: valid_from
             type: date
             nullable: false
-          - name: valid_to
-            type: date
-            nullable: true
     - name: create product version id
       description: Create an SHA256 hashed column called product_version_id, which takes a concatenation product_id and valid_from.
       inputs: [ add validity window ]

@@ -53,10 +53,6 @@ contract:
       type: date
       nullable: false
       description: "Snapshot date on which this version of the product's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one."
-    - name: valid_to
-      type: date
-      nullable: true
-      description: "Snapshot date on which the next version was first observed. Null for the current version."
     - name: product_version_id
       type: string
       nullable: false

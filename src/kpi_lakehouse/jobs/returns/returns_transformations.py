@@ -35,11 +35,11 @@ def create_updated_date_column(returns: DataFrame) -> DataFrame:
 
 def keep_latest_status(create_updated_date_column_result: DataFrame) -> DataFrame:
     """Keep the latest status per return_id within a 45-day lookback window,
-    excluding rejected returns.
+    excluding requested and rejected returns.
 
     Filters rows to retain only the most recently updated record per return_id
-    within the last 45 days, then removes any returns with a 'rejected' status,
-    keeping only requested, received, or refunded returns.
+    within the last 45 days, then removes any returns with a 'requested' or
+    'rejected' status, keeping only received or refunded returns.
 
     Args:
         create_updated_date_column_result: DataFrame containing return records with
@@ -48,8 +48,8 @@ def keep_latest_status(create_updated_date_column_result: DataFrame) -> DataFram
             and update_date columns.
 
     Returns:
-        DataFrame with the same schema, containing only the latest non-rejected
-        return record per return_id within the 45-day lookback window.
+        DataFrame with the same schema, containing only the latest received or
+        refunded return record per return_id within the 45-day lookback window.
     """
     max_export_date = create_updated_date_column_result.agg(F.max("export_date")).collect()[0][0]
     cutoff_date = F.date_sub(F.lit(max_export_date), 45)
@@ -57,7 +57,7 @@ def keep_latest_status(create_updated_date_column_result: DataFrame) -> DataFram
     window_spec = Window.partitionBy("return_id").orderBy(F.col("updated_at").desc())
     ranked_df = filtered_df.withColumn("_rank", F.rank().over(window_spec))
     latest_df = ranked_df.filter(F.col("_rank") == 1).drop("_rank")
-    result_df = latest_df.filter(F.lower(F.col("return_status")) != "rejected")
+    result_df = latest_df.filter(~F.lower(F.col("return_status")).isin(["requested", "rejected"]))
     return result_df
 
 
@@ -148,7 +148,7 @@ def compute_net_refund(convert_refund_amount_result: DataFrame) -> DataFrame:
     """
     return convert_refund_amount_result.withColumn(
         "net_refund_eur",
-        (F.col("refund_amount_eur") * (F.lit(1) + F.col("tax_rate"))).cast("decimal(12,2)"),
+        (F.col("refund_amount_eur") / (F.lit(1) + F.col("tax_rate"))).cast("decimal(12,2)"),
     ).select(
         "update_date",
         "export_date",

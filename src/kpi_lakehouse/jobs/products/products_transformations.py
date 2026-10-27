@@ -48,48 +48,58 @@ def create_tracked_columns(products: DataFrame) -> DataFrame:
 
 
 def filter_version_starts(create_tracked_columns_result: DataFrame) -> DataFrame:
-    """Filter rows where a new version starts and remove the version-start indicator column.
+    """Filter rows where a new version starts, excluding the earliest snapshot date.
+
+    Filters the DataFrame to retain only rows where `is_version_start` is True,
+    drops the `is_version_start` column, then removes rows belonging to the
+    earliest snapshot_date in the DataFrame — unless the DataFrame contains
+    only a single distinct snapshot_date.
 
     Args:
         create_tracked_columns_result: DataFrame containing product snapshot data
             with an `is_version_start` boolean column indicating version boundaries.
 
     Returns:
-        DataFrame containing only rows where `is_version_start` is True,
-        with the `is_version_start` column dropped.
+        DataFrame with version-start rows only, without the `is_version_start`
+        column, and with the earliest snapshot_date removed when multiple
+        snapshot dates exist.
     """
-    return create_tracked_columns_result.filter(F.col("is_version_start")).drop("is_version_start")
+    filtered = create_tracked_columns_result.filter(F.col("is_version_start")).drop(
+        "is_version_start"
+    )
+    min_date = create_tracked_columns_result.agg(
+        F.min("snapshot_date").alias("min_date")
+    ).collect()[0]["min_date"]
+    max_date = create_tracked_columns_result.agg(
+        F.max("snapshot_date").alias("max_date")
+    ).collect()[0]["max_date"]
+    if min_date == max_date:
+        return filtered
+    return filtered.filter(F.col("snapshot_date") != F.lit(min_date))
 
 
 def add_validity_window(filter_version_starts_result: DataFrame) -> DataFrame:
-    """Add valid_from and valid_to columns defining each record's validity window.
-
-    Computes valid_from as the snapshot_date and valid_to as the next snapshot_date
-    for the same product_id, using a window function ordered by snapshot_date.
+    """Adds a valid_from column derived from snapshot_date.
 
     Args:
-        filter_version_starts_result: DataFrame containing product snapshot records
-            with snapshot_date and product_id columns among others.
+        filter_version_starts_result: DataFrame containing product snapshot data
+            with a snapshot_date column.
 
     Returns:
-        DataFrame with the original columns plus valid_from (equal to snapshot_date)
-        and valid_to (equal to the next snapshot_date per product_id, or null if none).
+        DataFrame with an additional valid_from column set equal to snapshot_date.
     """
-    window_spec = Window.partitionBy("product_id").orderBy("snapshot_date")
-    return filter_version_starts_result.withColumn("valid_from", F.col("snapshot_date")).withColumn(
-        "valid_to", F.lead("snapshot_date").over(window_spec)
-    )
+    return filter_version_starts_result.withColumn("valid_from", F.col("snapshot_date"))
 
 
 def create_product_version_id(add_validity_window_result: DataFrame) -> DataFrame:
-    """Create a SHA256-hashed product_version_id column from product_id and valid_from.
+    """Creates a SHA256-hashed product_version_id column from product_id and valid_from.
 
     Args:
         add_validity_window_result: DataFrame containing product records with
-            product_id and valid_from columns used to derive the version identifier.
+            product_id and valid_from columns used to generate the version identifier.
 
     Returns:
-        DataFrame with all original columns plus a product_version_id string column
+        DataFrame with all original columns plus a product_version_id column
         containing the SHA256 hash of the concatenation of product_id and valid_from.
     """
     return add_validity_window_result.withColumn(

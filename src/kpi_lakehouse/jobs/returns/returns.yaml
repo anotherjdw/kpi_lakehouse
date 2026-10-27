@@ -37,7 +37,7 @@ job:
             type: date
             nullable: false
     - name: keep latest status
-      description: First, keep the latest updated_at per return_id with a 45 day lookback. Then, keep return that are requested, received or refunded, and filtered out rejected returns.
+      description: First, keep the latest updated_at per return_id with a 45 day lookback. Then, keep return that are received or refunded, and filtered out requested and rejected returns.
       inputs: [create updated_date column]
       depends_on: [create updated_date column]
       output:
@@ -60,7 +60,7 @@ job:
           - name: refund_amount_eur
             type: decimal(12,2)
     - name: compute net refund
-      description: Create a net_refund_eur column by multiply refund_amount_eur by (1 + tax_rate).
+      description: Create a net_refund_eur column by dividing refund_amount_eur by (1 + tax_rate).
       inputs: [convert refund amount]
       depends_on: [convert refund amount]
       output:

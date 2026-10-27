@@ -74,7 +74,6 @@ ADD_VALIDITY_WINDOW_SCHEMA = StructType(
         StructField("is_active", BooleanType(), nullable=True),
         StructField("launched_date", DateType(), nullable=True),
         StructField("valid_from", DateType(), nullable=True),
-        StructField("valid_to", DateType(), nullable=True),
     ]
 )
 

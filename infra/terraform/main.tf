@@ -89,7 +89,6 @@ module "catalog" {
         { name = "marketing_opt_in", type = "boolean", nullable = false, comment = "Whether the customer consents to marketing email. Can change over time." },
         { name = "is_deleted", type = "boolean", nullable = false, comment = "True once the customer requested erasure under GDPR Art. 17." },
         { name = "valid_from", type = "date", nullable = false, comment = "Snapshot date on which this version of the customer's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one." },
-        { name = "valid_to", type = "date", nullable = true, comment = "Snapshot date on which the next version was first observed. Null for the current version." },
         { name = "customer_version_id", type = "string", nullable = false, comment = "SHA256 hashed ID of the concatenation of the customer_id and valid_from fields." },
         { name = "birth_year", type = "int", nullable = true, comment = "Year of birth, optional at signup. Null after erasure." },
       ]
@@ -192,7 +191,6 @@ module "catalog" {
         { name = "is_active", type = "boolean", nullable = false, comment = "False once the product is delisted." },
         { name = "launched_date", type = "date", nullable = false, comment = "Date the product was first listed." },
         { name = "valid_from", type = "date", nullable = false, comment = "Snapshot date on which this version of the product's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one." },
-        { name = "valid_to", type = "date", nullable = true, comment = "Snapshot date on which the next version was first observed. Null for the current version." },
         { name = "product_version_id", type = "string", nullable = false, comment = "SHA256 hashed ID of the concatenation of the product_id and valid_from fields." },
       ]
     }
@@ -300,7 +298,7 @@ module "glue" {
       }
       arguments = {
         CUSTOMERS_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/customers/"
-        CUSTOMERS_LOOKBACK_DAYS = "14"
+        CUSTOMERS_LOOKBACK_DAYS = "2"
         OUTPUT_PATH             = "s3://${module.s3.bucket_names["preprocessed"]}/customers/"
         OUTPUT_TABLE            = "${module.catalog.table_names["preprocessed/customers"]}"
         PROCESSING_TYPE         = "lookback"
@@ -375,7 +373,7 @@ module "glue" {
         OUTPUT_TABLE           = "${module.catalog.table_names["preprocessed/products"]}"
         PROCESSING_TYPE        = "lookback"
         PRODUCTS_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/products/"
-        PRODUCTS_LOOKBACK_DAYS = "7"
+        PRODUCTS_LOOKBACK_DAYS = "2"
       }
     }
     returns = {
