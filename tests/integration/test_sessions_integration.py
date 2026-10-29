@@ -48,7 +48,6 @@ NOT_NULL_COLUMNS = [
     "session_id",
     "event_date",
     "first_event_time",
-    "customer_id",
     "last_event_type",
 ]
 

@@ -1,0 +1,55 @@
+# Output contract of the fact_session ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: processed
+  dataset: fact_session
+  description: One row per session and event date, with its date key, landing marketing channel, customer version and whether it led to an order.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [session_id, event_date]    # checked for duplicates on every write
+  schema: # include the partition column, typed date
+    - name: session_id
+      type: string
+      nullable: false
+      description: "Session the events belong to; a session ends after 30 minutes of inactivity."
+    - name: event_date
+      type: date
+      nullable: false
+      description: "Date of the session's events (UTC). Partition column."
+    - name: first_event_time
+      type: timestamp
+      nullable: false
+      description: "Time the session's first event happened on the client (UTC)."
+    - name: last_event_time
+      type: timestamp
+      nullable: true
+      description: "Time the session's last event happened on the client (UTC)."
+    - name: customer_id
+      type: string
+      nullable: true
+      description: "Foreign key to dim_customer.customer_id. Null for sessions where the visitor never logged in."
+    - name: last_event_type
+      type: string
+      nullable: false
+      description: "The last page type the visitor viewed during the session."
+    - name: order_id
+      type: string
+      nullable: true
+      description: "Foreign key to orders.order_id when the session ended in a purchase."
+    - name: customer_version_id
+      type: string
+      nullable: true
+      description: "Foreign key to dim_customer.customer_version_id: the customer's version valid on event_date. Null when customer_id is null or no version was valid on that date."
+    - name: date_key
+      type: int
+      nullable: false
+      description: "event_date as yyyyMMdd. Foreign key to dim_dates.date_key."
+    - name: converted_customer
+      type: boolean
+      nullable: false
+      description: "True when the session ended in a purchase (order_id is not null)."
+    - name: mkt_channel
+      type: string
+      nullable: true
+      description: "Marketing channel the session landed from: paid_search | paid_social | affiliate | email | organic_search | referral | direct. Foreign key to dim_channel.mkt_channel."

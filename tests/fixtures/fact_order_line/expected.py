@@ -116,6 +116,36 @@ KEEP_SESSION_LANDING_ROW_ROWS: list[Row] = [
         last_event_type="purchase",
         order_id="ORD-000004815",
     ),
+    Row(
+        session_id="9719141f1b1f3f46adfa67bad1d4d80f",
+        event_date=date(2026, 10, 16),
+        first_event_time=datetime(2026, 10, 16, 8, 30, 12, 345000),
+        last_event_time=datetime(2026, 10, 16, 8, 31, 5, 678000),
+        first_mkt_channel="email",
+        customer_id="C0001288",
+        last_event_type="product_view",
+        order_id=None,
+    ),
+    Row(
+        session_id="5fbc010fecf1bbba68cf4d2fac579005",
+        event_date=date(2026, 10, 17),
+        first_event_time=datetime(2026, 10, 17, 12, 0, 3, 210000),
+        last_event_time=datetime(2026, 10, 17, 12, 1, 48, 903000),
+        first_mkt_channel="direct",
+        customer_id="C0000417",
+        last_event_type="product_view",
+        order_id=None,
+    ),
+    Row(
+        session_id="2fb1576860038b627f325abff433c321",
+        event_date=date(2026, 10, 16),
+        first_event_time=datetime(2026, 10, 16, 14, 22, 9, 4000),
+        last_event_time=datetime(2026, 10, 16, 14, 22, 9, 4000),
+        first_mkt_channel="referral",
+        customer_id=None,
+        last_event_type="page_view",
+        order_id=None,
+    ),
 ]
 
 JOIN_ORDER_ITEMS_TO_ORDERS_REVIEWED = True
@@ -1541,7 +1571,7 @@ JOIN_SESSIONS_FOR_FALLBACK_CHANNEL_ROWS: list[Row] = [
         gross_margin_eur=Decimal("10.12"),
         net_revenue_after_returns_eur=Decimal("26.29"),
         session_channel=None,
-        fallback_channel=None,
+        fallback_channel="email",
     ),
     Row(
         order_id="ORD-000004814",
@@ -1716,7 +1746,7 @@ CREATE_MKT_CHANNEL_ROWS: list[Row] = [
         cost_eur=Decimal("16.17"),
         gross_margin_eur=Decimal("10.12"),
         net_revenue_after_returns_eur=Decimal("26.29"),
-        mkt_channel="direct",
+        mkt_channel="email",
     ),
     Row(
         order_id="ORD-000004814",
@@ -1891,7 +1921,7 @@ CREATE_DATE_KEY_ROWS: list[Row] = [
         returned_quantity=0,
         refund_net_eur=Decimal("0.00"),
         net_revenue_after_returns_eur=Decimal("26.29"),
-        mkt_channel="direct",
+        mkt_channel="email",
         date_key=20261017,
     ),
     Row(

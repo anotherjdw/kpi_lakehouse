@@ -163,6 +163,22 @@ fact_order_line_schema = StructType(
     ]
 )
 
+fact_session_schema = StructType(
+    [
+        StructField("session_id", StringType(), nullable=False),
+        StructField("event_date", DateType(), nullable=False),
+        StructField("first_event_time", TimestampType(), nullable=False),
+        StructField("last_event_time", TimestampType(), nullable=True),
+        StructField("customer_id", StringType(), nullable=True),
+        StructField("last_event_type", StringType(), nullable=False),
+        StructField("order_id", StringType(), nullable=True),
+        StructField("customer_version_id", StringType(), nullable=True),
+        StructField("date_key", IntegerType(), nullable=False),
+        StructField("converted_customer", BooleanType(), nullable=False),
+        StructField("mkt_channel", StringType(), nullable=True),
+    ]
+)
+
 fx_rates_schema = StructType(
     [
         StructField("rate_date", DateType(), nullable=False),
@@ -399,7 +415,7 @@ sessions_schema = StructType(
         StructField("first_event_time", TimestampType(), nullable=False),
         StructField("last_event_time", TimestampType(), nullable=True),
         StructField("first_mkt_channel", StringType(), nullable=True),
-        StructField("customer_id", StringType(), nullable=False),
+        StructField("customer_id", StringType(), nullable=True),
         StructField("last_event_type", StringType(), nullable=False),
         StructField("order_id", StringType(), nullable=True),
     ]

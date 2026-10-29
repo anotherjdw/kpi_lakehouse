@@ -254,7 +254,7 @@ module "catalog" {
         { name = "first_event_time", type = "timestamp", nullable = false, comment = "Time the first event happened on the client (UTC)." },
         { name = "last_event_time", type = "timestamp", nullable = true, comment = "Time the last event happened on the client (UTC)." },
         { name = "first_mkt_channel", type = "string", nullable = true, comment = "The first marketing channel from which the customer entered the website." },
-        { name = "customer_id", type = "string", nullable = false, comment = "Foreign key to customers.customer_id. Set only after the visitor logs in, so it can change within a session." },
+        { name = "customer_id", type = "string", nullable = true, comment = "Foreign key to customers.customer_id. Set only after the visitor logs in, so it can change within a session." },
         { name = "last_event_type", type = "string", nullable = false, comment = "The last page type the user visited during the session." },
         { name = "order_id", type = "string", nullable = true, comment = "Foreign key to orders.order_id for purchase events." },
       ]
@@ -334,6 +334,26 @@ module "catalog" {
         { name = "net_revenue_after_returns_eur", type = "decimal(12,2)", nullable = false, comment = "net_amount_eur - refund_net_eur, in Euros, excluding VAT." },
         { name = "mkt_channel", type = "string", nullable = false, comment = "Attributed channel: the order's session channel, else the customer's latest session channel within the 30 days before order_ts, else direct. paid_search | paid_social | affiliate | email | organic_search | referral | direct." },
         { name = "date_key", type = "int", nullable = false, comment = "order_date as yyyyMMdd." },
+      ]
+    }
+    "processed/fact_session" = {
+      layer       = "processed"
+      dataset     = "fact_session"
+      description = "One row per session and event date, with its date key, landing marketing channel, customer version and whether it led to an order."
+      partition_keys = [
+        { name = "event_date", type = "date", comment = "Date of the session's events (UTC). Partition column." },
+      ]
+      columns = [
+        { name = "session_id", type = "string", nullable = false, comment = "Session the events belong to; a session ends after 30 minutes of inactivity." },
+        { name = "first_event_time", type = "timestamp", nullable = false, comment = "Time the session's first event happened on the client (UTC)." },
+        { name = "last_event_time", type = "timestamp", nullable = true, comment = "Time the session's last event happened on the client (UTC)." },
+        { name = "customer_id", type = "string", nullable = true, comment = "Foreign key to dim_customer.customer_id. Null for sessions where the visitor never logged in." },
+        { name = "last_event_type", type = "string", nullable = false, comment = "The last page type the visitor viewed during the session." },
+        { name = "order_id", type = "string", nullable = true, comment = "Foreign key to orders.order_id when the session ended in a purchase." },
+        { name = "customer_version_id", type = "string", nullable = true, comment = "Foreign key to dim_customer.customer_version_id: the customer's version valid on event_date. Null when customer_id is null or no version was valid on that date." },
+        { name = "date_key", type = "int", nullable = false, comment = "event_date as yyyyMMdd. Foreign key to dim_dates.date_key." },
+        { name = "converted_customer", type = "boolean", nullable = false, comment = "True when the session ended in a purchase (order_id is not null)." },
+        { name = "mkt_channel", type = "string", nullable = true, comment = "Marketing channel the session landed from: paid_search | paid_social | affiliate | email | organic_search | referral | direct. Foreign key to dim_channel.mkt_channel." },
       ]
     }
   }
@@ -441,6 +461,21 @@ module "glue" {
         RETURNS_LOOKBACK_DAYS      = "45"
         SESSIONS_INPUT_PATH        = "s3://${module.s3.bucket_names["preprocessed"]}/sessions/"
         SESSIONS_LOOKBACK_DAYS     = "75"
+      }
+    }
+    fact_session = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        DIM_CUSTOMER_INPUT_PATH    = "s3://${module.s3.bucket_names["processed"]}/dim_customer/"
+        DIM_CUSTOMER_LOOKBACK_DAYS = "1095"
+        OUTPUT_PATH                = "s3://${module.s3.bucket_names["processed"]}/fact_session/"
+        OUTPUT_TABLE               = "${module.catalog.table_names["processed/fact_session"]}"
+        PROCESSING_TYPE            = "lookback"
+        SESSIONS_INPUT_PATH        = "s3://${module.s3.bucket_names["preprocessed"]}/sessions/"
+        SESSIONS_LOOKBACK_DAYS     = "2"
       }
     }
     fx_rates = {

@@ -31,7 +31,7 @@ contract:
       description: "The first marketing channel from which the customer entered the website."
     - name: customer_id
       type: string
-      nullable: false
+      nullable: true
       description: "Foreign key to customers.customer_id. Set only after the visitor logs in, so it can change within a session."
     - name: last_event_type
       type: string

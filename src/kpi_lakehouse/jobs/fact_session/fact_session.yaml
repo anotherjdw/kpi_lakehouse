@@ -1,0 +1,62 @@
+# Job spec for the fact_session ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/fact_session/ and its tests:
+# tests/unit/fact_session/, tests/integration/test_fact_session_integration.py,
+# tests/end_to_end/test_fact_session_e2e.py and tests/fixtures/fact_session/.
+job:
+  name: fact_session
+  description: One row per session and event date, with its date key, landing marketing channel, customer version and whether it led to an order.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - job: sessions
+      alias: sessions
+      allow_empty: false  # true lets this source read no rows without failing the run
+      lookback_days: 2
+    - job: dim_customer
+      alias: dim_customer
+      allow_empty: false
+      lookback_days: 1095 # full data
+  sink:
+    contract: fact_session   # the output contract: contracts/fact_session_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: event_date
+  transformations:
+    - name: join customer data
+      description: Left join dim_customer onto sessions on `customer_id`, where valid_from is earlier or equal to the event_date and either valid_to is null or the event_date is earlier than valid_to. Sessions with a null customer_id or no matching version keep customer_version_id null. Every session row is kept exactly once.
+      inputs: [sessions, dim_customer]
+      output:
+        grain_change: false
+        removes_columns: [valid_from, customer_segment, country_code, marketing_opt_in, birth_year, postal_code, valid_to, is_current]
+    - name: create date key
+      description: Create a date_key column, where date_key is the event_date formatted as yyyyMMdd and cast as an integer.
+      inputs: [join customer data]
+      depends_on: [join customer data]
+      output:
+        grain_change: false
+        columns:
+          - name: date_key
+            type: int
+    - name: create converted customer flag
+      description: Create a converted_customer column, where converted_customer is true when order_id is not null, otherwise false.
+      inputs: [create date key]
+      depends_on: [create date key]
+      output:
+        grain_change: false
+        columns:
+          - name: converted_customer
+            type: boolean
+    - name: rename marketing channel
+      description: Rename first_mkt_channel to mkt_channel
+      inputs: [create converted customer flag]
+      depends_on: [create converted customer flag]
+      output:
+        grain_change: false
+        removes_columns: [first_mkt_channel]
+        columns:
+          - name: mkt_channel
+            type: string
