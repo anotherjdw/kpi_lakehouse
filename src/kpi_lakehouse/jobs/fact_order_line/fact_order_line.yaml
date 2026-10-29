@@ -1,0 +1,179 @@
+# Job spec for the fact_order_line ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/fact_order_line/ and its tests:
+# tests/unit/fact_order_line/, tests/integration/test_fact_order_line_integration.py,
+# tests/end_to_end/test_fact_order_line_e2e.py and tests/fixtures/fact_order_line/.
+job:
+  name: fact_order_line
+  description: Fact table providing summary of key information about items ordered by the customer.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - job: orders
+      alias: orders
+      allow_empty: false  # true lets this source read no rows without failing the run
+      lookback_days: 45
+    - job: order_items
+      alias: order_items
+      allow_empty: false
+      lookback_days: 45
+    - job: returns
+      alias: returns
+      allow_empty: false
+      lookback_days: 45
+    - job: dim_customer
+      alias: dim_customer
+      allow_empty: false
+      lookback_days: 1095 # full history
+    - job: dim_product
+      alias: dim_product
+      allow_empty: false
+      lookback_days: 1095 # full history
+    - job: sessions
+      alias: sessions
+      allow_empty: false
+      lookback_days: 75
+  sink:
+    contract: fact_order_line   # the output contract: contracts/fact_order_line_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: order_date
+  transformations:
+    - name: select order columns
+      description: Keep only order_id, order_date, customer_id, session_id, order_ts and order_status from orders.
+      inputs: [orders]
+      output:
+        grain_change: false
+        removes_columns: [export_date, updated_at, currency_code, voucher_code, payment_method, shipping_country, rate_date, base_currency, quote_currency, rate, shipping_fee_eur]
+    - name: join order items to orders
+      description: >
+        Inner join selected orders data onto order_items on `order_id` and `order_date`.
+      inputs: [select order columns, order_items]
+      depends_on: [select order columns]
+      output:
+        grain_change: false
+        removes_columns: [rate]
+    - name: join customer version to order data
+      description: Left join dim_customer onto orders data on customer_id, where valid_from is earlier than or equal to the order_date and either valid_to is null or the order_date is earlier than valid_to, adding only customer_version_id to the dataset.
+      inputs: [join order items to orders, dim_customer]
+      depends_on: [join order items to orders]
+      output:
+        grain_change: false
+        removes_columns: [valid_from, country_code, postal_code, customer_segment, marketing_opt_in, birth_year, valid_to, is_current]
+    - name: join product version to orders data
+      description: Left join dim_product onto orders data on product_id, where valid_from is earlier than or equal to the order_date and either valid_to is null or order_date is earlier than valid_to, adding only the product_version_id and cost_price_eur dimensions to the dataset.
+      inputs: [join customer version to order data, dim_product]
+      depends_on: [join customer version to order data]
+      output:
+        grain_change: false
+        removes_columns: [valid_from, sku, product_name, brand, category_id, list_price_eur, is_active, launched_date, valid_to, is_current, category_id_level_1, category_id_level_2, category_id_level_3, category_id_level_4]
+    - name: create cost column
+      description: Create a cost_eur column where cost_eur is the quantity multiplied by cost_price_eur, with the data type as a decimal(12,2).
+      inputs: [join product version to orders data]
+      depends_on: [join product version to orders data]
+      output:
+        grain_change: false
+        removes_columns: [cost_price_eur]
+        columns:
+          - name: cost_eur
+            type: decimal(12,2)
+    - name: create gross margin column
+      description: Create a gross_margin_eur column, where gross_margin_eur is the difference between the net_amount_eur and cost_eur.
+      inputs: [create cost column]
+      depends_on: [create cost column]
+      output:
+        grain_change: false
+        columns:
+          - name: gross_margin_eur
+            type: decimal(12,2)
+    - name: keep latest return status
+      description: Keep the return rows with the latest updated_at per return_id.
+      inputs: [returns]
+      output:
+        grain_change: false
+    - name: aggregate returns
+      description: >-
+        Group by order_id and line_number, with the following aggregations: returned_quantity is the sum of quantity_returned, refund_net_eur is the sum of net_refund_eur, counting null net_refund_eur as 0.
+      inputs: [keep latest return status]
+      depends_on: [keep latest return status]
+      output:
+        grain_change: true
+        columns:
+          - name: order_id
+            type: string
+          - name: line_number
+            type: int
+          - name: returned_quantity
+            type: int
+          - name: refund_net_eur
+            type: decimal(12,2)
+    - name: join aggregated returns to order data
+      description: Left join aggregate returns to the order data on order_id and line_number. Keep every order line.
+      inputs: [aggregate returns, create gross margin column]
+      depends_on: [aggregate returns, create gross margin column]
+      output:
+        grain_change: false
+    - name: fill missing returns
+      description: Set returned_quantity to 0 where returned_quantity is null. Where refund_net_eur is null, set it to 0.00 as decimal(12,2) type.
+      inputs: [join aggregated returns to order data]
+      depends_on: [join aggregated returns to order data]
+      output:
+        grain_change: false
+    - name: create net revenue after returns
+      description: Create a net_revenue_after_returns_eur column, where net_revenue_after_returns_eur is net_amount_eur minus refund_net_eur as decimal(12,2) type.
+      inputs: [fill missing returns]
+      depends_on: [fill missing returns]
+      output:
+        grain_change: false
+        columns:
+          - name: net_revenue_after_returns_eur
+            type: decimal(12,2)
+    - name: keep session landing row
+      description: Keep the session row with the earliest first_event_time per session_id.
+      inputs: [sessions]
+      output:
+        grain_change: false
+    - name: join session channel
+      description: left join session data onto orders data on session_id, adding the first_mkt_channel column as session_channel. Lines whose session_id is null or has no match have a session_channel value as null. Keep every order line.
+      inputs: [create net revenue after returns, keep session landing row]
+      depends_on: [create net revenue after returns, keep session landing row]
+      output:
+        grain_change: false
+        removes_columns: [event_date, first_event_time, last_event_time, first_mkt_channel, last_event_type]
+        columns:
+          - name: session_channel
+            type: string
+    - name: join sessions for fallback channel
+      description: >
+        Left join sessions to the order lines on customer_id, matching sessions whose first_mkt_channel is not direct and whose first_event_time is in [order_ts - 30 days, order_ts). Add the match’s first_mkt_channel as fallback_channel. If several sessions match a line, keep only the latest first_event_time (ties: highest session_id), so each order_id and line_number appears once. A line with no match keeps one row with fallback_channel null.
+      inputs: [join session channel, sessions]
+      depends_on: [join session channel]
+      output:
+        grain_change: false
+        removes_columns: [event_date, first_event_time, last_event_time, first_mkt_channel, last_event_type]
+        columns:
+          - name: fallback_channel
+            type: string
+    - name: create mkt channel
+      description: >
+        Create a mkt_channel column by coalescing the session_channel and fallback_channel, in that order. If the mkt_channel value is still null, fill the null values with 'direct'.
+      inputs: [join sessions for fallback channel]
+      depends_on: [join sessions for fallback channel]
+      output:
+        grain_change: false
+        removes_columns: [session_channel, fallback_channel]
+        columns:
+          - name: mkt_channel
+            type: string
+    - name: create date key
+      description: Create a date_key column, where date_key is the order_date formatted as yyyyMMdd and cast as an integer.
+      inputs: [create mkt channel]
+      depends_on: [create mkt channel]
+      output:
+        grain_change: false
+        columns:
+          - name: date_key
+            type: int

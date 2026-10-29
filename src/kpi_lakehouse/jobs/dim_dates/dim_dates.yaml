@@ -1,0 +1,112 @@
+# Job spec for the dim_dates ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/dim_dates/ and its tests:
+# tests/unit/dim_dates/, tests/integration/test_dim_dates_integration.py,
+# tests/end_to_end/test_dim_dates_e2e.py and tests/fixtures/dim_dates/.
+job:
+  name: dim_dates
+  description: Creates date related dimensions for use in fact tables.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: backfill        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - contract: dates
+      alias: dates
+      allow_empty: false  # true lets this source read no rows without failing the run
+  sink:
+    contract: dim_dates   # the output contract: contracts/dim_dates_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+  transformations:
+    - name: create date key
+      description: >
+        Converts each date into an integer in yyyymmdd format to use as the table's primary key.
+      inputs: [dates]
+      output:
+        grain_change: false
+        columns:            # columns this transformation adds; delete the block if none
+          - name: date_key
+            type: int
+            nullable: false
+    - name: create year column
+      description: Create a year column, that extracts the year from the date column.
+      inputs: [create date key]
+      depends_on: [create date key]
+      output:
+        grain_change: false
+        columns:
+          - name: year
+            type: int
+            nullable: false
+    - name: create quarter column
+      description: Create a quarter column, where quarter = quarter of date, 1 to 4.
+      inputs: [create year column]
+      depends_on: [create year column]
+      output:
+        grain_change: false
+        columns:
+        - name: quarter
+          type: int
+          nullable: false
+    - name: create month column
+      description: Create a month column, where month = month of date, 1 to 12.
+      inputs: [create quarter column]
+      depends_on: [create quarter column]
+      output:
+        grain_change: false
+        columns:
+          - name: month
+            type: int
+            nullable: false
+    - name: create iso week column
+      description: Create an iso_week column, where iso_week = the ISO 8601 week of the year of date.
+      inputs: [create month column]
+      depends_on: [create month column]
+      output:
+        grain_change: false
+        columns:
+          - name: iso_week
+            type: int
+            nullable: false
+    - name: create weekday column
+      description: Create a weekday column, where weekday = the ISO day of the week - 1 for Monday to 7 for Sunday.
+      inputs: [create iso week column]
+      depends_on: [create iso week column]
+      output:
+        grain_change: false
+        columns:
+          - name: weekday
+            type: int
+            nullable: false
+    - name: create weekend flag
+      description: Create an is_weekend column, where is_weekend = true when weekday is 6 or 7, otherwise false.
+      inputs: [create weekday column]
+      depends_on: [create weekday column]
+      output:
+        grain_change: false
+        columns:
+          - name: is_weekend
+            type: boolean
+            nullable: false
+    - name: create month start column
+      description: Create a month_start column, which extracts the date field to create columns that show the first date of the given month in YYYY-MM-DD format. For example, for 2026-02-17, the month_begin would be 2026-02-01.
+      inputs: [create weekend flag]
+      depends_on: [create weekend flag]
+      output:
+        grain_change: false
+        columns:
+          - name: month_start
+            type: date
+            nullable: false
+    - name: create month end column
+      description: Create a month_end column, which extracts the date field to create columns that show the last date of the given month in YYYY-MM-DD format. For example, for 2026-02-17, the month_end would be 2026-02-28.
+      inputs: [ create month start column ]
+      depends_on: [ create month start column ]
+      output:
+        grain_change: false
+        columns:
+          - name: month_end
+            type: date
+            nullable: false

@@ -61,9 +61,6 @@ NOT_NULL_COLUMNS = [
     "unit_price",
     "discount_amount",
     "tax_rate",
-    "rate",
-    "gross_amount_eur",
-    "net_amount_eur",
 ]
 
 

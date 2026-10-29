@@ -31,7 +31,7 @@ job:
   transformations:
     - name: join order data
       description: >
-        Select order_date, order_id and rate from the orders data set. Left join orders to order_items on order_id and order_date.
+        Select order_date, order_id and rate from the orders data set. Left join orders onto order_items on order_id and order_date. Keep every row of order_items.
       inputs: [orders, order_items]
       output:
         grain_change: false

@@ -1,0 +1,79 @@
+# Output contract of the dim_product ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: processed
+  dataset: dim_product
+  description: Dimension table containing key information about the product catalog and the category hierarchy of products.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [ product_id, valid_from ]    # checked for duplicates on every write
+  schema: # include the partition column, typed date
+    - name: valid_from
+      type: date
+      nullable: false
+      description: "Snapshot date on which this version of the product's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one. Partition column"
+    - name: product_id
+      type: string
+      nullable: false
+      description: "Natural key of the product."
+    - name: sku
+      type: string
+      nullable: false
+      description: "Stock keeping unit printed on the label."
+    - name: product_name
+      type: string
+      nullable: false
+      description: "Display name in the shop."
+    - name: brand
+      type: string
+      nullable: false
+      description: "Brand name."
+    - name: category_id
+      type: string
+      nullable: false
+      description: "Foreign key to categories.category_id, always a leaf category."
+    - name: list_price_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Current list price in EUR including German VAT. Actual charged prices are on order_items."
+    - name: cost_price_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Purchase cost per unit in EUR excluding VAT, used for margin."
+    - name: is_active
+      type: boolean
+      nullable: false
+      description: "False once the product is delisted."
+    - name: launched_date
+      type: date
+      nullable: false
+      description: "Date the product was first listed."
+    - name: product_version_id
+      type: string
+      nullable: false
+      description: "SHA256 hashed ID of the concatenation of the product_id and valid_from fields."
+    - name: valid_to
+      type: date
+      nullable: true
+      description: "Date until which this version of the product record is valid."
+    - name: is_current
+      type: boolean
+      nullable: false
+      description: "Boolean flag indicating whether the selected version of the product data is current."
+    - name: category_id_level_1
+      type: string
+      nullable: false
+      description: "First level parent category of the category_id."
+    - name: category_id_level_2
+      type: string
+      nullable: true
+      description: "Second level parent category of the category_id."
+    - name: category_id_level_3
+      type: string
+      nullable: true
+      description: "Third level parent category of the category_id."
+    - name: category_id_level_4
+      type: string
+      nullable: true
+      description: "Fourth level parent category of the category_id."

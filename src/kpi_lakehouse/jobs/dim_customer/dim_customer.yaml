@@ -1,0 +1,55 @@
+# Job spec for the dim_customer ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/dim_customer/ and its tests:
+# tests/unit/dim_customer/, tests/integration/test_dim_customer_integration.py,
+# tests/end_to_end/test_dim_customer_e2e.py and tests/fixtures/dim_customer/.
+job:
+  name: dim_customer
+  description: Dimension table providing additional anonymized data relating to current and former customers.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - job: customers
+      # job: <job name>   # instead of contract, to read another job's output; create that job first
+      alias: customers
+      allow_empty: false  # true lets this source read no rows without failing the run
+      # The dates this source reads, if it is partitioned by date; an unpartitioned source sets none.
+      lookback_days: 1095    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      # start_date: 2026-01-01   # YYYY-MM-DD; set both dates when type is backfill, neither for lookback
+      # end_date: 2026-01-01     # backfill processes every day from start_date to end_date
+  sink:
+    contract: dim_customer   # the output contract: contracts/dim_customer_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: valid_from
+  transformations:
+    - name: create valid_to column
+      description: >
+        Create a valid_to column, where valid_to is equal to the lead value of valid_from over a window partitioned by customer_id and ordered by valid_from, so that the latest version has a null value for valid_to.
+      inputs: [customers]
+      output:
+        grain_change: false
+        columns:            # columns this transformation adds; delete the block if none
+          - name: valid_to
+            type: date
+    - name: create is_current flag
+      description: >
+        Create an is_current column, where is_current is true when valid_to is null. Otherwise the value is false.
+      inputs: [create valid_to column]
+      depends_on: [create valid_to column]
+      output:
+        grain_change: false
+        columns:
+          - name: is_current
+            type: boolean
+    - name: select dimensions
+      description: >-
+        Select the customer_version_id, customer_id, customer_segment, country_code, marketing_opt_in, birth_year, postal_code, valid_from, valid_to and is_current.
+      inputs: [create is_current flag]
+      depends_on: [create is_current flag]
+      output:
+        grain_change: false
+        removes_columns: [snapshot_date, email, signup_ts, is_deleted]

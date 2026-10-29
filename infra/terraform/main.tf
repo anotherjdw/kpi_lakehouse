@@ -142,9 +142,9 @@ module "catalog" {
         { name = "unit_price", type = "decimal(12,2)", nullable = false, comment = "Price charged per unit, in the order's currency, including VAT, before discount." },
         { name = "discount_amount", type = "decimal(12,2)", nullable = false, comment = "Total discount on the line, in the order's currency, including any voucher value allocated to it." },
         { name = "tax_rate", type = "decimal(5,4)", nullable = false, comment = "VAT rate included in unit_price, e.g. 0.1900." },
-        { name = "rate", type = "decimal(18,8)", nullable = false, comment = "Units of the order's currency per 1 EUR, as of order_date. An amount converts to EUR as amount / rate." },
-        { name = "gross_amount_eur", type = "decimal(12,2)", nullable = false, comment = "Price charged for all units purchased in Euros, including VAT, after discount." },
-        { name = "net_amount_eur", type = "decimal(12,2)", nullable = false, comment = "Price charged for all units purchased in Euros, excluding VAT, after discount." },
+        { name = "rate", type = "decimal(18,8)", nullable = true, comment = "Units of the order's currency per 1 EUR, as of order_date. An amount converts to EUR as amount / rate." },
+        { name = "gross_amount_eur", type = "decimal(12,2)", nullable = true, comment = "Price charged for all units purchased in Euros, including VAT, after discount." },
+        { name = "net_amount_eur", type = "decimal(12,2)", nullable = true, comment = "Price charged for all units purchased in Euros, excluding VAT, after discount." },
       ]
     }
     "preprocessed/orders" = {
@@ -259,6 +259,83 @@ module "catalog" {
         { name = "order_id", type = "string", nullable = true, comment = "Foreign key to orders.order_id for purchase events." },
       ]
     }
+    "processed/dim_customer" = {
+      layer       = "processed"
+      dataset     = "dim_customer"
+      description = "Dimension table providing additional anonymized data relating to current and former customers."
+      partition_keys = [
+        { name = "valid_from", type = "date", comment = "Snapshot date on which this version of the customer's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one. Partition column." },
+      ]
+      columns = [
+        { name = "customer_id", type = "string", nullable = false, comment = "Natural key of the customer. Kept after erasure." },
+        { name = "country_code", type = "string", nullable = true, comment = "ISO 3166-1 alpha-2 country of the default address. Null after erasure." },
+        { name = "postal_code", type = "string", nullable = true, comment = "Postal code of the default address. Null after erasure." },
+        { name = "customer_segment", type = "string", nullable = false, comment = "standard | plus (paid membership) | business. Can change over time." },
+        { name = "marketing_opt_in", type = "boolean", nullable = false, comment = "Whether the customer consents to marketing email. Can change over time." },
+        { name = "customer_version_id", type = "string", nullable = false, comment = "SHA256 hashed ID of the concatenation of the customer_id and valid_from fields." },
+        { name = "birth_year", type = "int", nullable = true, comment = "Year of birth, optional at signup. Null after erasure." },
+        { name = "valid_to", type = "date", nullable = true, comment = "Date until which this version of the customer's record is valid." },
+        { name = "is_current", type = "boolean", nullable = false, comment = "Boolean flag indicating whether the selected version of the customer's data is current." },
+      ]
+    }
+    "processed/dim_product" = {
+      layer       = "processed"
+      dataset     = "dim_product"
+      description = "Dimension table containing key information about the product catalog and the category hierarchy of products."
+      partition_keys = [
+        { name = "valid_from", type = "date", comment = "Snapshot date on which this version of the product's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one. Partition column" },
+      ]
+      columns = [
+        { name = "product_id", type = "string", nullable = false, comment = "Natural key of the product." },
+        { name = "sku", type = "string", nullable = false, comment = "Stock keeping unit printed on the label." },
+        { name = "product_name", type = "string", nullable = false, comment = "Display name in the shop." },
+        { name = "brand", type = "string", nullable = false, comment = "Brand name." },
+        { name = "category_id", type = "string", nullable = false, comment = "Foreign key to categories.category_id, always a leaf category." },
+        { name = "list_price_eur", type = "decimal(12,2)", nullable = false, comment = "Current list price in EUR including German VAT. Actual charged prices are on order_items." },
+        { name = "cost_price_eur", type = "decimal(12,2)", nullable = false, comment = "Purchase cost per unit in EUR excluding VAT, used for margin." },
+        { name = "is_active", type = "boolean", nullable = false, comment = "False once the product is delisted." },
+        { name = "launched_date", type = "date", nullable = false, comment = "Date the product was first listed." },
+        { name = "product_version_id", type = "string", nullable = false, comment = "SHA256 hashed ID of the concatenation of the product_id and valid_from fields." },
+        { name = "valid_to", type = "date", nullable = true, comment = "Date until which this version of the product record is valid." },
+        { name = "is_current", type = "boolean", nullable = false, comment = "Boolean flag indicating whether the selected version of the product data is current." },
+        { name = "category_id_level_1", type = "string", nullable = false, comment = "First level parent category of the category_id." },
+        { name = "category_id_level_2", type = "string", nullable = true, comment = "Second level parent category of the category_id." },
+        { name = "category_id_level_3", type = "string", nullable = true, comment = "Third level parent category of the category_id." },
+        { name = "category_id_level_4", type = "string", nullable = true, comment = "Fourth level parent category of the category_id." },
+      ]
+    }
+    "processed/fact_order_line" = {
+      layer       = "processed"
+      dataset     = "fact_order_line"
+      description = "One row per order line, with the customer and product versions valid on the order date, cost, margin, returns and the attributed marketing channel."
+      partition_keys = [
+        { name = "order_date", type = "date", comment = "Date the order was placed (UTC). Partition column." },
+      ]
+      columns = [
+        { name = "order_id", type = "string", nullable = false, comment = "Foreign key to orders.order_id." },
+        { name = "line_number", type = "int", nullable = false, comment = "Position of the line within the order, starting at 1." },
+        { name = "customer_id", type = "string", nullable = false, comment = "Foreign key to customers.customer_id." },
+        { name = "session_id", type = "string", nullable = true, comment = "Foreign key to sessions.session_id. Null for orders placed by customer service or without a tracked session." },
+        { name = "order_ts", type = "timestamp", nullable = false, comment = "Time the order was placed (UTC)." },
+        { name = "order_status", type = "string", nullable = false, comment = "Latest status of the order: placed | paid | shipped | delivered | cancelled." },
+        { name = "product_id", type = "string", nullable = false, comment = "Foreign key to products.product_id." },
+        { name = "quantity", type = "int", nullable = false, comment = "Units ordered." },
+        { name = "unit_price", type = "decimal(12,2)", nullable = false, comment = "Price charged per unit, in the order's currency, including VAT, before discount." },
+        { name = "discount_amount", type = "decimal(12,2)", nullable = false, comment = "Total discount on the line, in the order's currency, including any voucher value allocated to it." },
+        { name = "tax_rate", type = "decimal(5,4)", nullable = false, comment = "VAT rate included in unit_price, e.g. 0.1900." },
+        { name = "gross_amount_eur", type = "decimal(12,2)", nullable = true, comment = "Price charged for all units in Euros, including VAT, after discount." },
+        { name = "net_amount_eur", type = "decimal(12,2)", nullable = true, comment = "Price charged for all units in Euros, excluding VAT, after discount." },
+        { name = "customer_version_id", type = "string", nullable = true, comment = "Foreign key to dim_customer.customer_version_id: the customer version valid on order_date. Null when no version covers order_date." },
+        { name = "product_version_id", type = "string", nullable = true, comment = "Foreign key to dim_product.product_version_id: the product version valid on order_date. Null when no version covers order_date." },
+        { name = "cost_eur", type = "decimal(12,2)", nullable = true, comment = "quantity * cost_price_eur of the product version valid on order_date. Null when no product version matched." },
+        { name = "gross_margin_eur", type = "decimal(12,2)", nullable = true, comment = "net_amount_eur - cost_eur, before returns. Null when cost_eur is null." },
+        { name = "returned_quantity", type = "int", nullable = false, comment = "Units returned on this line, summed over its received and refunded returns. 0 when none." },
+        { name = "refund_net_eur", type = "decimal(12,2)", nullable = false, comment = "Refunds on this line in Euros, excluding VAT, converted at the order-date rate. 0.00 when none." },
+        { name = "net_revenue_after_returns_eur", type = "decimal(12,2)", nullable = false, comment = "net_amount_eur - refund_net_eur, in Euros, excluding VAT." },
+        { name = "mkt_channel", type = "string", nullable = false, comment = "Attributed channel: the order's session channel, else the customer's latest session channel within the 30 days before order_ts, else direct. paid_search | paid_social | affiliate | email | organic_search | referral | direct." },
+        { name = "date_key", type = "int", nullable = false, comment = "order_date as yyyyMMdd." },
+      ]
+    }
   }
   # <<< AMEND:TABLES
   # END Hive tables
@@ -302,6 +379,68 @@ module "glue" {
         OUTPUT_PATH             = "s3://${module.s3.bucket_names["preprocessed"]}/customers/"
         OUTPUT_TABLE            = "${module.catalog.table_names["preprocessed/customers"]}"
         PROCESSING_TYPE         = "lookback"
+      }
+    }
+    dim_customer = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        CUSTOMERS_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/customers/"
+        CUSTOMERS_LOOKBACK_DAYS = "1095"
+        OUTPUT_PATH             = "s3://${module.s3.bucket_names["processed"]}/dim_customer/"
+        OUTPUT_TABLE            = "${module.catalog.table_names["processed/dim_customer"]}"
+        PROCESSING_TYPE         = "lookback"
+      }
+    }
+    dim_dates = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        DATES_INPUT_PATH = "s3://${module.s3.bucket_names["raw"]}/dates/"
+        OUTPUT_PATH      = "s3://${module.s3.bucket_names["preprocessed"]}/dim_dates/"
+        PROCESSING_TYPE  = "backfill"
+      }
+    }
+    dim_product = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        CATEGORIES_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/category/"
+        CATEGORIES_LOOKBACK_DAYS = "1"
+        OUTPUT_PATH              = "s3://${module.s3.bucket_names["processed"]}/dim_product/"
+        OUTPUT_TABLE             = "${module.catalog.table_names["processed/dim_product"]}"
+        PROCESSING_TYPE          = "lookback"
+        PRODUCTS_INPUT_PATH      = "s3://${module.s3.bucket_names["preprocessed"]}/products/"
+        PRODUCTS_LOOKBACK_DAYS   = "1095"
+      }
+    }
+    fact_order_line = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        DIM_CUSTOMER_INPUT_PATH    = "s3://${module.s3.bucket_names["processed"]}/dim_customer/"
+        DIM_CUSTOMER_LOOKBACK_DAYS = "1095"
+        DIM_PRODUCT_INPUT_PATH     = "s3://${module.s3.bucket_names["processed"]}/dim_product/"
+        DIM_PRODUCT_LOOKBACK_DAYS  = "1095"
+        ORDERS_INPUT_PATH          = "s3://${module.s3.bucket_names["preprocessed"]}/orders/"
+        ORDERS_LOOKBACK_DAYS       = "45"
+        ORDER_ITEMS_INPUT_PATH     = "s3://${module.s3.bucket_names["preprocessed"]}/order_items/"
+        ORDER_ITEMS_LOOKBACK_DAYS  = "45"
+        OUTPUT_PATH                = "s3://${module.s3.bucket_names["processed"]}/fact_order_line/"
+        OUTPUT_TABLE               = "${module.catalog.table_names["processed/fact_order_line"]}"
+        PROCESSING_TYPE            = "lookback"
+        RETURNS_INPUT_PATH         = "s3://${module.s3.bucket_names["preprocessed"]}/returns/"
+        RETURNS_LOOKBACK_DAYS      = "45"
+        SESSIONS_INPUT_PATH        = "s3://${module.s3.bucket_names["preprocessed"]}/sessions/"
+        SESSIONS_LOOKBACK_DAYS     = "75"
       }
     }
     fx_rates = {
@@ -422,6 +561,7 @@ module "glue" {
   scheduled_triggers = {}
 
   conditional_triggers = {
+    dim_customer    = "customers"
     marketing_spend = "fx_rates"
     order_items     = "orders"
     orders          = "fx_rates"

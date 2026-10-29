@@ -83,6 +83,86 @@ dates_schema = StructType(
     ]
 )
 
+dim_customer_schema = StructType(
+    [
+        StructField("valid_from", DateType(), nullable=False),
+        StructField("customer_id", StringType(), nullable=False),
+        StructField("country_code", StringType(), nullable=True),
+        StructField("postal_code", StringType(), nullable=True),
+        StructField("customer_segment", StringType(), nullable=False),
+        StructField("marketing_opt_in", BooleanType(), nullable=False),
+        StructField("customer_version_id", StringType(), nullable=False),
+        StructField("birth_year", IntegerType(), nullable=True),
+        StructField("valid_to", DateType(), nullable=True),
+        StructField("is_current", BooleanType(), nullable=False),
+    ]
+)
+
+dim_dates_schema = StructType(
+    [
+        StructField("date", DateType(), nullable=False),
+        StructField("date_key", IntegerType(), nullable=False),
+        StructField("year", IntegerType(), nullable=False),
+        StructField("quarter", IntegerType(), nullable=False),
+        StructField("month", IntegerType(), nullable=False),
+        StructField("iso_week", IntegerType(), nullable=False),
+        StructField("weekday", IntegerType(), nullable=False),
+        StructField("is_weekend", BooleanType(), nullable=False),
+        StructField("month_start", DateType(), nullable=False),
+        StructField("month_end", DateType(), nullable=False),
+    ]
+)
+
+dim_product_schema = StructType(
+    [
+        StructField("valid_from", DateType(), nullable=False),
+        StructField("product_id", StringType(), nullable=False),
+        StructField("sku", StringType(), nullable=False),
+        StructField("product_name", StringType(), nullable=False),
+        StructField("brand", StringType(), nullable=False),
+        StructField("category_id", StringType(), nullable=False),
+        StructField("list_price_eur", DecimalType(12, 2), nullable=False),
+        StructField("cost_price_eur", DecimalType(12, 2), nullable=False),
+        StructField("is_active", BooleanType(), nullable=False),
+        StructField("launched_date", DateType(), nullable=False),
+        StructField("product_version_id", StringType(), nullable=False),
+        StructField("valid_to", DateType(), nullable=True),
+        StructField("is_current", BooleanType(), nullable=False),
+        StructField("category_id_level_1", StringType(), nullable=False),
+        StructField("category_id_level_2", StringType(), nullable=True),
+        StructField("category_id_level_3", StringType(), nullable=True),
+        StructField("category_id_level_4", StringType(), nullable=True),
+    ]
+)
+
+fact_order_line_schema = StructType(
+    [
+        StructField("order_date", DateType(), nullable=False),
+        StructField("order_id", StringType(), nullable=False),
+        StructField("line_number", IntegerType(), nullable=False),
+        StructField("customer_id", StringType(), nullable=False),
+        StructField("session_id", StringType(), nullable=True),
+        StructField("order_ts", TimestampType(), nullable=False),
+        StructField("order_status", StringType(), nullable=False),
+        StructField("product_id", StringType(), nullable=False),
+        StructField("quantity", IntegerType(), nullable=False),
+        StructField("unit_price", DecimalType(12, 2), nullable=False),
+        StructField("discount_amount", DecimalType(12, 2), nullable=False),
+        StructField("tax_rate", DecimalType(5, 4), nullable=False),
+        StructField("gross_amount_eur", DecimalType(12, 2), nullable=True),
+        StructField("net_amount_eur", DecimalType(12, 2), nullable=True),
+        StructField("customer_version_id", StringType(), nullable=True),
+        StructField("product_version_id", StringType(), nullable=True),
+        StructField("cost_eur", DecimalType(12, 2), nullable=True),
+        StructField("gross_margin_eur", DecimalType(12, 2), nullable=True),
+        StructField("returned_quantity", IntegerType(), nullable=False),
+        StructField("refund_net_eur", DecimalType(12, 2), nullable=False),
+        StructField("net_revenue_after_returns_eur", DecimalType(12, 2), nullable=False),
+        StructField("mkt_channel", StringType(), nullable=False),
+        StructField("date_key", IntegerType(), nullable=False),
+    ]
+)
+
 fx_rates_schema = StructType(
     [
         StructField("rate_date", DateType(), nullable=False),
@@ -145,9 +225,9 @@ order_items_schema = StructType(
         StructField("unit_price", DecimalType(12, 2), nullable=False),
         StructField("discount_amount", DecimalType(12, 2), nullable=False),
         StructField("tax_rate", DecimalType(5, 4), nullable=False),
-        StructField("rate", DecimalType(18, 8), nullable=False),
-        StructField("gross_amount_eur", DecimalType(12, 2), nullable=False),
-        StructField("net_amount_eur", DecimalType(12, 2), nullable=False),
+        StructField("rate", DecimalType(18, 8), nullable=True),
+        StructField("gross_amount_eur", DecimalType(12, 2), nullable=True),
+        StructField("net_amount_eur", DecimalType(12, 2), nullable=True),
     ]
 )
 

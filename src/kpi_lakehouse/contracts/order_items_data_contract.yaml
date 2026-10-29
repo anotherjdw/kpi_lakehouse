@@ -47,13 +47,13 @@ contract:
       description: "VAT rate included in unit_price, e.g. 0.1900."
     - name: rate
       type: decimal(18,8)
-      nullable: false
+      nullable: true
       description: "Units of the order's currency per 1 EUR, as of order_date. An amount converts to EUR as amount / rate."
     - name: gross_amount_eur
       type: decimal(12,2)
-      nullable: false
+      nullable: true
       description: "Price charged for all units purchased in Euros, including VAT, after discount."
     - name: net_amount_eur
       type: decimal(12,2)
-      nullable: false
+      nullable: true
       description: "Price charged for all units purchased in Euros, excluding VAT, after discount."

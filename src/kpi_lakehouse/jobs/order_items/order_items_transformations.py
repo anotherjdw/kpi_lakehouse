@@ -22,23 +22,22 @@ from kpi_lakehouse.utils.spark import spark_session
 
 
 def join_order_data(orders: DataFrame, order_items: DataFrame) -> DataFrame:
-    """Join orders with order items on order_id and order_date.
+    """Join orders with order_items, keeping all order_items rows.
 
     Selects order_date, order_id, and rate from orders, then left joins
-    to order_items on order_id and order_date to produce a combined dataset.
+    order_items onto the orders subset using order_id and order_date as keys,
+    preserving every row from order_items.
 
     Args:
-        orders: DataFrame containing order-level data including rate and
-            exchange rate information.
-        order_items: DataFrame containing line-item-level data for each order.
+        orders: DataFrame containing order-level data including rate information.
+        order_items: DataFrame containing line-item data for each order.
 
     Returns:
         DataFrame with order_date, order_id, rate from orders combined with
-        line_number, product_id, quantity, unit_price, discount_amount, and
-        tax_rate from order_items.
+        line-item columns from order_items, with all order_items rows retained.
     """
-    orders_selected = orders.select(F.col("order_date"), F.col("order_id"), F.col("rate"))
-    result = orders_selected.join(order_items, on=["order_id", "order_date"], how="left").select(
+    orders_subset = orders.select(F.col("order_date"), F.col("order_id"), F.col("rate"))
+    result = order_items.join(orders_subset, on=["order_id", "order_date"], how="left").select(
         F.col("order_date"),
         F.col("order_id"),
         F.col("rate"),

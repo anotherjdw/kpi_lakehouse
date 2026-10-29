@@ -1,0 +1,109 @@
+# Output contract of the fact_order_line ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: processed
+  dataset: fact_order_line
+  description: One row per order line, with the customer and product versions valid on the order date, cost, margin, returns and the attributed marketing channel.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [order_id, line_number]    # checked for duplicates on every write
+  schema: # include the partition column, typed date
+    - name: order_date
+      type: date
+      nullable: false
+      description: "Date the order was placed (UTC). Partition column."
+    - name: order_id
+      type: string
+      nullable: false
+      description: "Foreign key to orders.order_id."
+    - name: line_number
+      type: int
+      nullable: false
+      description: "Position of the line within the order, starting at 1."
+      constraints:
+        min: 1
+    - name: customer_id
+      type: string
+      nullable: false
+      description: "Foreign key to customers.customer_id."
+    - name: session_id
+      type: string
+      nullable: true
+      description: "Foreign key to sessions.session_id. Null for orders placed by customer service or without a tracked session."
+    - name: order_ts
+      type: timestamp
+      nullable: false
+      description: "Time the order was placed (UTC)."
+    - name: order_status
+      type: string
+      nullable: false
+      description: "Latest status of the order: placed | paid | shipped | delivered | cancelled."
+    - name: product_id
+      type: string
+      nullable: false
+      description: "Foreign key to products.product_id."
+    - name: quantity
+      type: int
+      nullable: false
+      description: "Units ordered."
+      constraints:
+        min: 1
+    - name: unit_price
+      type: decimal(12,2)
+      nullable: false
+      description: "Price charged per unit, in the order's currency, including VAT, before discount."
+    - name: discount_amount
+      type: decimal(12,2)
+      nullable: false
+      description: "Total discount on the line, in the order's currency, including any voucher value allocated to it."
+    - name: tax_rate
+      type: decimal(5,4)
+      nullable: false
+      description: "VAT rate included in unit_price, e.g. 0.1900."
+    - name: gross_amount_eur
+      type: decimal(12,2)
+      nullable: true
+      description: "Price charged for all units in Euros, including VAT, after discount."
+    - name: net_amount_eur
+      type: decimal(12,2)
+      nullable: true
+      description: "Price charged for all units in Euros, excluding VAT, after discount."
+    - name: customer_version_id
+      type: string
+      nullable: true
+      description: "Foreign key to dim_customer.customer_version_id: the customer version valid on order_date. Null when no version covers order_date."
+    - name: product_version_id
+      type: string
+      nullable: true
+      description: "Foreign key to dim_product.product_version_id: the product version valid on order_date. Null when no version covers order_date."
+    - name: cost_eur
+      type: decimal(12,2)
+      nullable: true
+      description: "quantity * cost_price_eur of the product version valid on order_date. Null when no product version matched."
+    - name: gross_margin_eur
+      type: decimal(12,2)
+      nullable: true
+      description: "net_amount_eur - cost_eur, before returns. Null when cost_eur is null."
+    - name: returned_quantity
+      type: int
+      nullable: false
+      description: "Units returned on this line, summed over its received and refunded returns. 0 when none."
+      constraints:
+        min: 0
+    - name: refund_net_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Refunds on this line in Euros, excluding VAT, converted at the order-date rate. 0.00 when none."
+    - name: net_revenue_after_returns_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "net_amount_eur - refund_net_eur, in Euros, excluding VAT."
+    - name: mkt_channel
+      type: string
+      nullable: false
+      description: "Attributed channel: the order's session channel, else the customer's latest session channel within the 30 days before order_ts, else direct. paid_search | paid_social | affiliate | email | organic_search | referral | direct."
+    - name: date_key
+      type: int
+      nullable: false
+      description: "order_date as yyyyMMdd."

@@ -1,0 +1,64 @@
+# Job spec for the dim_product ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/dim_product/ and its tests:
+# tests/unit/dim_product/, tests/integration/test_dim_product_integration.py,
+# tests/end_to_end/test_dim_product_e2e.py and tests/fixtures/dim_product/.
+job:
+  name: dim_product
+  description: Dimension table containing key information about the product catalog and the category hierarchy of products.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+  sources:
+    - job: products
+      alias: products
+      allow_empty: false
+      lookback_days: 1095 # full history
+    - job: categories
+      alias: categories
+      allow_empty: false
+      lookback_days: 1
+  sink:
+    contract: dim_product   # the output contract: contracts/dim_product_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: valid_from
+  transformations:
+    - name: create valid_to column
+      description: >
+        Create a valid_to column, where valid_to is equal to the lead value of valid_from over a window partitioned by product_id and ordered by valid_from, so that the latest version has a null value for valid_to.
+      inputs: [products]
+      output:
+        grain_change: false
+        columns:
+          - name: valid_to
+            type: date
+    - name: create is_current flag
+      description: Create an is_current column, where is_current is true when valid_to is null. Otherwise the value is false.
+      inputs: [create valid_to column]
+      depends_on: [create valid_to column]
+      output:
+        grain_change: false
+        removes_columns: [snapshot_date]
+        columns:
+          - name: is_current
+            type: boolean
+    - name: filter latest category snapshot
+      description: Keep only the categories rows whose snapshot_date is the latest snapshot_date in the DataFrame.
+      inputs: [categories]
+      output:
+        grain_change: false
+    - name: select category path dimensions
+      description: Select category_id, category_id_level_1, category_id_level_2, category_id_level_3 and category_id_level_4.
+      inputs: [filter latest category snapshot]
+      depends_on: [filter latest category snapshot]
+      output:
+        grain_change: false
+        removes_columns: [snapshot_date, category_name, parent_category_id, is_active, updated_at]
+    - name: join category path
+      description: left join categories data onto products data on `category_id`. Keep every product row, including any whose category_id has no match.
+      inputs: [ create is_current flag, select category path dimensions ]
+      depends_on: [ create is_current flag, select category path dimensions ]
+      output:
+        grain_change: false

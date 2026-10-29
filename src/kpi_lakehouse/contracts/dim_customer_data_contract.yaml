@@ -1,0 +1,53 @@
+# Output contract of the dim_customer ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: processed
+  dataset: dim_customer
+  description: Dimension table providing additional anonymized data relating to current and former customers.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [ valid_from, customer_id ]    # checked for duplicates on every write
+  schema: # include the partition column, typed date
+    - name: valid_from
+      type: date
+      nullable: false
+      description: "Snapshot date on which this version of the customer's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one. Partition column."
+    - name: customer_id
+      type: string
+      nullable: false
+      description: "Natural key of the customer. Kept after erasure."
+    - name: country_code
+      type: string
+      nullable: true
+      description: "ISO 3166-1 alpha-2 country of the default address. Null after erasure."
+    - name: postal_code
+      type: string
+      nullable: true
+      classification: pii
+      description: "Postal code of the default address. Null after erasure."
+    - name: customer_segment
+      type: string
+      nullable: false
+      description: "standard | plus (paid membership) | business. Can change over time."
+    - name: marketing_opt_in
+      type: boolean
+      nullable: false
+      description: "Whether the customer consents to marketing email. Can change over time."
+    - name: customer_version_id
+      type: string
+      nullable: false
+      description: "SHA256 hashed ID of the concatenation of the customer_id and valid_from fields."
+    - name: birth_year
+      type: int
+      nullable: true
+      classification: pii
+      description: "Year of birth, optional at signup. Null after erasure."
+    - name: valid_to
+      type: date
+      nullable: true
+      description: "Date until which this version of the customer's record is valid."
+    - name: is_current
+      type: boolean
+      nullable: false
+      description: "Boolean flag indicating whether the selected version of the customer's data is current."

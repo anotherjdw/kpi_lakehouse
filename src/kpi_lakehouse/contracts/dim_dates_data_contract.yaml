@@ -1,0 +1,63 @@
+# Output contract of the dim_dates ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: preprocessed
+  dataset: dim_dates
+  description: Reference data source that contains key dimensions based on calendar date.
+  # table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [date]    # checked for duplicates on every write
+  schema: # include the partition column, typed date
+    - name: date
+      type: date
+      nullable: false
+      description: "Calender date."
+    - name: date_key
+      type: int
+      nullable: false
+      description: "Calender date in yyyymmdd format."
+    - name: year
+      type: int
+      nullable: false
+      description: "Year of the calendar date."
+    - name: quarter
+      type: int
+      nullable: false
+      description: "Quarter of the calendar date."
+      constraints:
+        min: 1
+        max: 4
+    - name: month
+      type: int
+      nullable: false
+      description: "Month of the calendar date."
+      constraints:
+        min: 1
+        max: 12
+    - name: iso_week
+      type: int
+      nullable: false
+      description: "ISO week of the calendar date."
+      constraints:
+        min: 1
+        max: 52
+    - name: weekday
+      type: int
+      nullable: false
+      description: "Weekday number of the calendar date, where 1 is Monday and 7 is Sunday."
+      constraints:
+        min: 1
+        max: 7
+    - name: is_weekend
+      type: boolean
+      nullable: false
+      description: "Boolean flag to indicate whether the calendar date falls on a weekend."
+    - name: month_start
+      type: date
+      nullable: false
+      description: "First day of the calendar month in YYYY-MM-DD format."
+    - name: month_end
+      type: date
+      nullable: false
+      description: "Last day of the calendar month in YYYY-MM-DD format."
