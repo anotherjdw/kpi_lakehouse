@@ -356,6 +356,27 @@ module "catalog" {
         { name = "mkt_channel", type = "string", nullable = true, comment = "Marketing channel the session landed from: paid_search | paid_social | affiliate | email | organic_search | referral | direct. Foreign key to dim_channel.mkt_channel." },
       ]
     }
+    "processed/kpi_daily_sales" = {
+      layer       = "processed"
+      dataset     = "kpi_daily_sales"
+      description = "Daily KPI summary reporting order and revenue data."
+      partition_keys = [
+        { name = "order_date", type = "date", comment = "Date the order was placed (UTC). Partition column." },
+      ]
+      columns = [
+        { name = "orders", type = "int", nullable = false, comment = "Daily amount of successfully processed orders." },
+        { name = "cancelled_orders", type = "int", nullable = false, comment = "Daily amount of cancelled orders." },
+        { name = "units", type = "int", nullable = true, comment = "Total amount of items contained within the successfully processed orders for a given day." },
+        { name = "gmv_eur", type = "decimal(12,2)", nullable = true, comment = "The Gross Merchandising Value of the successfully processed orders for a given day." },
+        { name = "net_sales_eur", type = "decimal(12,2)", nullable = true, comment = "Gross revenue of all successfully processed orders, excluding VAT, after discounts applied." },
+        { name = "net_revenue_eur", type = "decimal(12,2)", nullable = true, comment = "Gross revenue of all successfully processed orders, excluding VAT, after discounts and refunds applied." },
+        { name = "gross_margin_eur", type = "decimal(12,2)", nullable = true, comment = "Gross revneue of all successfully processed orders, excluding VAT, after discounts and item cost applied." },
+        { name = "date_key", type = "int", nullable = false, comment = "order_date as yyyyMMdd." },
+        { name = "aov_eur", type = "decimal(12,2)", nullable = true, comment = "The average order value of successfully processed orders for a given day." },
+        { name = "gross_margin_pct", type = "decimal(2,2)", nullable = true, comment = "Ratio indicating the profitability of all orders successfully processed for a given day." },
+        { name = "cancellation_rate", type = "decimal(2,2)", nullable = true, comment = "Ratio of cancelled orders to all orders, indicating how frequently orders were cancelled on a given day." },
+      ]
+    }
   }
   # <<< AMEND:TABLES
   # END Hive tables
@@ -492,6 +513,19 @@ module "glue" {
         PROCESSING_TYPE        = "lookback"
       }
     }
+    kpi_daily_sales = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        FACT_ORDER_LINE_INPUT_PATH    = "s3://${module.s3.bucket_names["processed"]}/fact_order_line/"
+        FACT_ORDER_LINE_LOOKBACK_DAYS = "45"
+        OUTPUT_PATH                   = "s3://${module.s3.bucket_names["processed"]}/kpi_daily_sales/"
+        OUTPUT_TABLE                  = "${module.catalog.table_names["processed/kpi_daily_sales"]}"
+        PROCESSING_TYPE               = "lookback"
+      }
+    }
     marketing_spend = {
       glue = {
         number_of_workers = 2
@@ -597,6 +631,7 @@ module "glue" {
 
   conditional_triggers = {
     dim_customer    = "customers"
+    kpi_daily_sales = "fact_order_line"
     marketing_spend = "fx_rates"
     order_items     = "orders"
     orders          = "fx_rates"

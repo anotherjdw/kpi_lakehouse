@@ -197,6 +197,23 @@ fx_rates_raw_schema = StructType(
     ]
 )
 
+kpi_daily_sales_schema = StructType(
+    [
+        StructField("order_date", DateType(), nullable=False),
+        StructField("orders", IntegerType(), nullable=False),
+        StructField("cancelled_orders", IntegerType(), nullable=False),
+        StructField("units", IntegerType(), nullable=True),
+        StructField("gmv_eur", DecimalType(12, 2), nullable=True),
+        StructField("net_sales_eur", DecimalType(12, 2), nullable=True),
+        StructField("net_revenue_eur", DecimalType(12, 2), nullable=True),
+        StructField("gross_margin_eur", DecimalType(12, 2), nullable=True),
+        StructField("date_key", IntegerType(), nullable=False),
+        StructField("aov_eur", DecimalType(12, 2), nullable=True),
+        StructField("gross_margin_pct", DecimalType(2, 2), nullable=True),
+        StructField("cancellation_rate", DecimalType(2, 2), nullable=True),
+    ]
+)
+
 marketing_spend_schema = StructType(
     [
         StructField("spend_date", DateType(), nullable=False),

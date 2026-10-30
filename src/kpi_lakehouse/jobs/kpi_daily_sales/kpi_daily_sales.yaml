@@ -1,0 +1,83 @@
+# Job spec for the kpi_daily_sales ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/kpi_daily_sales/ and its tests:
+# tests/unit/kpi_daily_sales/, tests/integration/test_kpi_daily_sales_integration.py,
+# tests/end_to_end/test_kpi_daily_sales_e2e.py and tests/fixtures/kpi_daily_sales/.
+job:
+  name: kpi_daily_sales
+  description: Daily KPI summary reporting order and revenue data.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - job: fact_order_line
+      alias: fact_order_line
+      allow_empty: false  # true lets this source read no rows without failing the run
+      lookback_days: 45
+  sink:
+    contract: kpi_daily_sales   # the output contract: contracts/kpi_daily_sales_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: order_date
+  transformations:
+    - name: aggregate daily totals
+      description: >
+        Group by order_date, and aggregate as follows: orders is the distinct count of order_id whose order_status is not "cancelled"; cancelled_orders is the distinct count of order_id whose order_status is "cancelled". Over lines whose order_status != "cancelled": units is the sum of quantity; gmv_eur is the sum of gross_amount_eur, net_sales_eur is the sum of net_amount_eur; net_revenue_eur is the sum of net_revenue_eur; gross_margin_eur = sum of gross_margin_eur.
+      inputs: [fact_order_line]
+      output:
+        grain_change: true
+        columns:
+          - name: order_date
+            type: date
+          - name: orders
+            type: int
+          - name: cancelled_orders
+            type: int
+          - name: units
+            type: int
+          - name: gmv_eur
+            type: decimal(12,2)
+          - name: net_sales_eur
+            type: decimal(12,2)
+          - name: net_revenue_eur
+            type: decimal(12,2)
+          - name: gross_margin_eur
+            type: decimal(12,2)
+    - name: create date key
+      description: Create a date_key column, where date_key is the order_date formatted as yyyyMMdd and cast as an integer.
+      inputs: [ aggregate daily totals ]
+      depends_on: [ aggregate daily totals ]
+      output:
+        grain_change: false
+        columns:
+          - name: date_key
+            type: int
+    - name: create average order value column
+      description: Create an aov_eur column, where aov_eur = net_revenue_eur / orders. Leave the aov_eur values null if orders is 0.
+      inputs: [ create date key ]
+      depends_on: [ create date key ]
+      output:
+        grain_change: false
+        columns:
+          - name: aov_eur
+            type: decimal(12,2)
+    - name: create gross margin percentage column
+      description: Create a gross_margin_pct column, where gross_margin_pct = gross_margin_eur / net_sales_eur. Leave the gross_margin_pct values null if net_sales_eur is 0.
+      inputs: [ create average order value column ]
+      depends_on: [ create average order value column ]
+      output:
+        grain_change: false
+        columns:
+          - name: gross_margin_pct
+            type: decimal(2,2)
+    - name: create cancellation rate column
+      description: Create a cancellation_rate column, where cancellation_rate = cancelled_orders / (orders + cancelled_orders). Leave the cancellation_rate values null if the sum of orders and cancelled orders is 0.
+      inputs: [ create gross margin percentage column ]
+      depends_on: [ create gross margin percentage column ]
+      output:
+        grain_change: false
+        columns:
+          - name: cancellation_rate
+            type: decimal(2,2)

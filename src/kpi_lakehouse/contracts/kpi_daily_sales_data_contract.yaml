@@ -1,0 +1,59 @@
+# Output contract of the kpi_daily_sales ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: processed
+  dataset: kpi_daily_sales
+  description: Daily KPI summary reporting order and revenue data.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [order_date]    # checked for duplicates on every write
+  schema:
+    - name: order_date
+      type: date
+      nullable: false
+      description: "Date the order was placed (UTC). Partition column."
+    - name: orders
+      type: int
+      nullable: false
+      description: "Daily amount of successfully processed orders."
+    - name: cancelled_orders
+      type: int
+      nullable: false
+      description: "Daily amount of cancelled orders."
+    - name: units
+      type: int
+      nullable: true
+      description: "Total amount of items contained within the successfully processed orders for a given day."
+    - name: gmv_eur
+      type: decimal(12,2)
+      nullable: true
+      description: "The Gross Merchandising Value of the successfully processed orders for a given day."
+    - name: net_sales_eur
+      type: decimal(12,2)
+      nullable: true
+      description: "Gross revenue of all successfully processed orders, excluding VAT, after discounts applied."
+    - name: net_revenue_eur
+      type: decimal(12,2)
+      nullable: true
+      description: "Gross revenue of all successfully processed orders, excluding VAT, after discounts and refunds applied."
+    - name: gross_margin_eur
+      type: decimal(12,2)
+      nullable: true
+      description: "Gross revneue of all successfully processed orders, excluding VAT, after discounts and item cost applied."
+    - name: date_key
+      type: int
+      nullable: false
+      description: "order_date as yyyyMMdd."
+    - name: aov_eur
+      type: decimal(12,2)
+      nullable: true
+      description: "The average order value of successfully processed orders for a given day."
+    - name: gross_margin_pct
+      type: decimal(2,2)
+      nullable: true
+      description: "Ratio indicating the profitability of all orders successfully processed for a given day."
+    - name: cancellation_rate
+      type: decimal(2,2)
+      nullable: true
+      description: "Ratio of cancelled orders to all orders, indicating how frequently orders were cancelled on a given day."
