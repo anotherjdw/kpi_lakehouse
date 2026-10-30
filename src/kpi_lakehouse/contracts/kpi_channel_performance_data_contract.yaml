@@ -1,0 +1,51 @@
+# Output contract of the kpi_channel_performance ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: processed
+  dataset: kpi_channel_performance
+  description: One row per day and marketing channel, with sessions, conversions, attributed net revenue, ad spend and return on ad spend.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [date, mkt_channel]    # checked for duplicates on every write
+  schema: # include the partition column, typed date
+    - name: date
+      type: date
+      nullable: false
+      description: "Day the sessions started, the orders were placed and the spend was incurred (UTC). Partition column."
+    - name: mkt_channel
+      type: string
+      nullable: true
+      description: "Marketing channel: paid_search | paid_social | affiliate | email | organic_search | referral | direct. Null for sessions fact_session has no channel for."
+    - name: sessions
+      type: bigint
+      nullable: false
+      description: "Sessions that started on date through mkt_channel. 0 when none."
+      constraints:
+        min: 0
+    - name: converted_sessions
+      type: bigint
+      nullable: false
+      description: "Sessions among sessions that ended in a purchase. 0 when none."
+      constraints:
+        min: 0
+    - name: attributed_net_revenue_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Net revenue in Euros, excluding VAT, after returns, of the non-cancelled order lines placed on date and attributed to mkt_channel. 0.00 when none."
+    - name: spend_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Ad spend in Euros on date for mkt_channel, at the latest restatement. 0.00 when none."
+    - name: date_key
+      type: int
+      nullable: false
+      description: "date as yyyyMMdd."
+    - name: conversion_rate
+      type: decimal(5,4)
+      nullable: true
+      description: "converted_sessions / sessions. Null when sessions is 0."
+    - name: roas
+      type: decimal(12,2)
+      nullable: true
+      description: "Return on ad spend: attributed_net_revenue_eur / spend_eur. Null when spend_eur is 0."

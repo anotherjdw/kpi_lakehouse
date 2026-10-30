@@ -1,0 +1,118 @@
+# Job spec for the kpi_channel_performance ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/kpi_channel_performance/ and its tests:
+# tests/unit/kpi_channel_performance/, tests/integration/test_kpi_channel_performance_integration.py,
+# tests/end_to_end/test_kpi_channel_performance_e2e.py and tests/fixtures/kpi_channel_performance/.
+job:
+  name: kpi_channel_performance
+  description: One row per day and marketing channel, with sessions, conversions, attributed net revenue, ad spend and return on ad spend.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
+  sources:
+    - job: fact_session
+      alias: fact_session
+      allow_empty: false  # true lets this source read no rows without failing the run
+      lookback_days: 45
+    - job: fact_order_line
+      alias: fact_order_line
+      allow_empty: false
+      lookback_days: 45
+    - job: marketing_spend
+      alias: marketing_spend
+      allow_empty: false
+      lookback_days: 45
+  sink:
+    contract: kpi_channel_performance   # the output contract: contracts/kpi_channel_performance_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: date
+  transformations:
+    - name: aggregate sessions
+      description: >
+        Group fact_sessions by event_date and mkt_channel, and aggregate as follows: sessions is the count of rows, and converted_sessions is the count of rows when converted_customer is true. Rename event_date as date.
+      inputs: [fact_session]
+      output:
+        grain_change: true
+        columns:
+          - name: date
+            type: date
+          - name: mkt_channel
+            type: string
+          - name: sessions
+            type: bigint
+          - name: converted_sessions
+            type: bigint
+    - name: filter completed orders
+      description: Keep the rows in fact_order_line whose order_status is not "cancelled".
+      inputs: [fact_order_line]
+      output:
+        grain_change: false
+    - name: aggregate attributed revenue
+      description: >
+        Group by order_date and mkt_channel, and aggregate as follows: attributed_net_revenue_eur is the sum of net_revenue_after_returns_eur. Rename order_date as date.
+      inputs: [filter completed orders]
+      depends_on: [filter completed orders]
+      output:
+        grain_change: true
+        columns:
+          - name: date
+            type: date
+          - name: mkt_channel
+            type: string
+          - name: attributed_net_revenue_eur
+            type: decimal(12,2)
+    - name: aggregate marketing spend
+      description: >
+        Group by spend_date and mkt_channel, and aggregate as follows: spend_eur is the sum of spend_amount_eur. Rename spend_date as date.
+      inputs: [marketing_spend]
+      output:
+        grain_change: true
+        columns:
+          - name: date
+            type: date
+          - name: mkt_channel
+            type: string
+          - name: spend_eur
+            type: decimal(12,2)
+    - name: combine channel metrics
+      description: Full outer join of all three aggregated datasets, on date and mkt_channel. Keep every date and mkt_channel that appears in any of them.
+      inputs: [aggregate sessions, aggregate attributed revenue, aggregate marketing spend]
+      depends_on: [aggregate sessions, aggregate attributed revenue, aggregate marketing spend]
+      output:
+        grain_change: false
+    - name: fill missing metrics
+      description: Fill sessions, converted_sessions to 0 as integer. Fill attributed_net_revenue_eur and spend_eur as 0.00 as decimal(12,2).
+      inputs: [combine channel metrics]
+      depends_on: [combine channel metrics]
+      output:
+        grain_change: false
+    - name: create date key
+      description: Create a date_key column, where date_key is the date formatted as yyyyMMdd and cast as an integer.
+      inputs: [fill missing metrics]
+      depends_on: [fill missing metrics]
+      output:
+        grain_change: false
+        columns:
+          - name: date_key
+            type: int
+    - name: create conversion rate
+      description: Create a conversion rate column, where conversion_rate = converted_sessions/sessions; null when sessions is 0.
+      inputs: [create date key]
+      depends_on: [create date key]
+      output:
+        grain_change: false
+        columns:
+          - name: conversion_rate
+            type: decimal(5,4)
+    - name: create return on ad spend
+      description: create an roas column, where roas = attributed_net_revenue_eur / spend_eur; null when spend_eur is 0.
+      inputs: [create conversion rate]
+      depends_on: [create conversion rate]
+      output:
+        grain_change: false
+        columns:
+          - name: roas
+            type: decimal(12,2)

@@ -197,6 +197,20 @@ fx_rates_raw_schema = StructType(
     ]
 )
 
+kpi_channel_performance_schema = StructType(
+    [
+        StructField("date", DateType(), nullable=False),
+        StructField("mkt_channel", StringType(), nullable=True),
+        StructField("sessions", LongType(), nullable=False),
+        StructField("converted_sessions", LongType(), nullable=False),
+        StructField("attributed_net_revenue_eur", DecimalType(12, 2), nullable=False),
+        StructField("spend_eur", DecimalType(12, 2), nullable=False),
+        StructField("date_key", IntegerType(), nullable=False),
+        StructField("conversion_rate", DecimalType(5, 4), nullable=True),
+        StructField("roas", DecimalType(12, 2), nullable=True),
+    ]
+)
+
 kpi_daily_sales_schema = StructType(
     [
         StructField("order_date", DateType(), nullable=False),

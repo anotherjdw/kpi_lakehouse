@@ -356,6 +356,24 @@ module "catalog" {
         { name = "mkt_channel", type = "string", nullable = true, comment = "Marketing channel the session landed from: paid_search | paid_social | affiliate | email | organic_search | referral | direct. Foreign key to dim_channel.mkt_channel." },
       ]
     }
+    "processed/kpi_channel_performance" = {
+      layer       = "processed"
+      dataset     = "kpi_channel_performance"
+      description = "One row per day and marketing channel, with sessions, conversions, attributed net revenue, ad spend and return on ad spend."
+      partition_keys = [
+        { name = "date", type = "date", comment = "Day the sessions started, the orders were placed and the spend was incurred (UTC). Partition column." },
+      ]
+      columns = [
+        { name = "mkt_channel", type = "string", nullable = true, comment = "Marketing channel: paid_search | paid_social | affiliate | email | organic_search | referral | direct. Null for sessions fact_session has no channel for." },
+        { name = "sessions", type = "bigint", nullable = false, comment = "Sessions that started on date through mkt_channel. 0 when none." },
+        { name = "converted_sessions", type = "bigint", nullable = false, comment = "Sessions among sessions that ended in a purchase. 0 when none." },
+        { name = "attributed_net_revenue_eur", type = "decimal(12,2)", nullable = false, comment = "Net revenue in Euros, excluding VAT, after returns, of the non-cancelled order lines placed on date and attributed to mkt_channel. 0.00 when none." },
+        { name = "spend_eur", type = "decimal(12,2)", nullable = false, comment = "Ad spend in Euros on date for mkt_channel, at the latest restatement. 0.00 when none." },
+        { name = "date_key", type = "int", nullable = false, comment = "date as yyyyMMdd." },
+        { name = "conversion_rate", type = "decimal(5,4)", nullable = true, comment = "converted_sessions / sessions. Null when sessions is 0." },
+        { name = "roas", type = "decimal(12,2)", nullable = true, comment = "Return on ad spend: attributed_net_revenue_eur / spend_eur. Null when spend_eur is 0." },
+      ]
+    }
     "processed/kpi_daily_sales" = {
       layer       = "processed"
       dataset     = "kpi_daily_sales"
@@ -511,6 +529,23 @@ module "glue" {
         OUTPUT_PATH            = "s3://${module.s3.bucket_names["preprocessed"]}/fx_rates/"
         OUTPUT_TABLE           = "${module.catalog.table_names["preprocessed/fx_rates"]}"
         PROCESSING_TYPE        = "lookback"
+      }
+    }
+    kpi_channel_performance = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        FACT_ORDER_LINE_INPUT_PATH    = "s3://${module.s3.bucket_names["processed"]}/fact_order_line/"
+        FACT_ORDER_LINE_LOOKBACK_DAYS = "45"
+        FACT_SESSION_INPUT_PATH       = "s3://${module.s3.bucket_names["processed"]}/fact_session/"
+        FACT_SESSION_LOOKBACK_DAYS    = "45"
+        MARKETING_SPEND_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/marketing_spend/"
+        MARKETING_SPEND_LOOKBACK_DAYS = "45"
+        OUTPUT_PATH                   = "s3://${module.s3.bucket_names["processed"]}/kpi_channel_performance/"
+        OUTPUT_TABLE                  = "${module.catalog.table_names["processed/kpi_channel_performance"]}"
+        PROCESSING_TYPE               = "lookback"
       }
     }
     kpi_daily_sales = {
