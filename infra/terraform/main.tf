@@ -395,6 +395,22 @@ module "catalog" {
         { name = "cancellation_rate", type = "decimal(2,2)", nullable = true, comment = "Ratio of cancelled orders to all orders, indicating how frequently orders were cancelled on a given day." },
       ]
     }
+    "processed/kpi_return_rate" = {
+      layer       = "processed"
+      dataset     = "kpi_return_rate"
+      description = "One row per calendar month and level 1 category, with units sold, units returned, net refunds and return rate."
+      partition_keys = [
+        { name = "month", type = "date", comment = "First day of the calendar month the orders were placed in (UTC). Partition column." },
+      ]
+      columns = [
+        { name = "category_id_level_1", type = "string", nullable = true, comment = "Level 1 category of the product version ordered. Null for order lines with no product version on order_date." },
+        { name = "units_sold", type = "int", nullable = false, comment = "Units ordered on the non-cancelled order lines placed in month." },
+        { name = "units_returned", type = "int", nullable = false, comment = "Units returned on those order lines, over their received and refunded returns. 0 when none." },
+        { name = "net_refunds_eur", type = "decimal(12,2)", nullable = false, comment = "Refunds on those order lines in Euros, excluding VAT, converted at the order-date rate. 0.00 when none." },
+        { name = "return_rate", type = "decimal(5,4)", nullable = true, comment = "units_returned / units_sold. Null when units_sold is 0." },
+        { name = "is_final", type = "boolean", nullable = false, comment = "True when the latest order_date read is more than 45 days after the last day of month, so no more returns are expected; otherwise false." },
+      ]
+    }
   }
   # <<< AMEND:TABLES
   # END Hive tables
@@ -558,6 +574,21 @@ module "glue" {
         FACT_ORDER_LINE_LOOKBACK_DAYS = "45"
         OUTPUT_PATH                   = "s3://${module.s3.bucket_names["processed"]}/kpi_daily_sales/"
         OUTPUT_TABLE                  = "${module.catalog.table_names["processed/kpi_daily_sales"]}"
+        PROCESSING_TYPE               = "lookback"
+      }
+    }
+    kpi_return_rate = {
+      glue = {
+        number_of_workers = 2
+        worker_type       = "G.1X"
+      }
+      arguments = {
+        DIM_PRODUCT_INPUT_PATH        = "s3://${module.s3.bucket_names["processed"]}/dim_product/"
+        DIM_PRODUCT_LOOKBACK_DAYS     = "1095"
+        FACT_ORDER_LINE_INPUT_PATH    = "s3://${module.s3.bucket_names["processed"]}/fact_order_line/"
+        FACT_ORDER_LINE_LOOKBACK_DAYS = "77"
+        OUTPUT_PATH                   = "s3://${module.s3.bucket_names["processed"]}/kpi_return_rate/"
+        OUTPUT_TABLE                  = "${module.catalog.table_names["processed/kpi_return_rate"]}"
         PROCESSING_TYPE               = "lookback"
       }
     }

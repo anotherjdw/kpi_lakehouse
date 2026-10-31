@@ -1,0 +1,43 @@
+# Output contract of the kpi_return_rate ETL job: the dataset it writes. Generation-time input;
+# never deployed. Fill in every value shaped like <...>.
+contract:
+  layer: processed
+  dataset: kpi_return_rate
+  description: One row per calendar month and level 1 category, with units sold, units returned, net refunds and return rate.
+  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+                            # snake_case dataset and column names
+  grain:
+    unique_key: [month, category_id_level_1]    # checked for duplicates on every write
+  schema: # include the partition column, typed date
+    - name: month
+      type: date
+      nullable: false
+      description: "First day of the calendar month the orders were placed in (UTC). Partition column."
+    - name: category_id_level_1
+      type: string
+      nullable: true
+      description: "Level 1 category of the product version ordered. Null for order lines with no product version on order_date."
+    - name: units_sold
+      type: int
+      nullable: false
+      description: "Units ordered on the non-cancelled order lines placed in month."
+      constraints:
+        min: 0
+    - name: units_returned
+      type: int
+      nullable: false
+      description: "Units returned on those order lines, over their received and refunded returns. 0 when none."
+      constraints:
+        min: 0
+    - name: net_refunds_eur
+      type: decimal(12,2)
+      nullable: false
+      description: "Refunds on those order lines in Euros, excluding VAT, converted at the order-date rate. 0.00 when none."
+    - name: return_rate
+      type: decimal(5,4)
+      nullable: true
+      description: "units_returned / units_sold. Null when units_sold is 0."
+    - name: is_final
+      type: boolean
+      nullable: false
+      description: "True when the latest order_date read is more than 45 days after the last day of month, so no more returns are expected; otherwise false."

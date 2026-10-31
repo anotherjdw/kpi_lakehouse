@@ -228,6 +228,18 @@ kpi_daily_sales_schema = StructType(
     ]
 )
 
+kpi_return_rate_schema = StructType(
+    [
+        StructField("month", DateType(), nullable=False),
+        StructField("category_id_level_1", StringType(), nullable=True),
+        StructField("units_sold", IntegerType(), nullable=False),
+        StructField("units_returned", IntegerType(), nullable=False),
+        StructField("net_refunds_eur", DecimalType(12, 2), nullable=False),
+        StructField("return_rate", DecimalType(5, 4), nullable=True),
+        StructField("is_final", BooleanType(), nullable=False),
+    ]
+)
+
 marketing_spend_schema = StructType(
     [
         StructField("spend_date", DateType(), nullable=False),

@@ -1,0 +1,97 @@
+# Job spec for the kpi_return_rate ETL job. Generation-time input; never deployed.
+# Fill in every value shaped like <...>. Unknown fields and leftover <...> values fail validation.
+# To delete this job, delete src/<package>/jobs/kpi_return_rate/ and its tests:
+# tests/unit/kpi_return_rate/, tests/integration/test_kpi_return_rate_integration.py,
+# tests/end_to_end/test_kpi_return_rate_e2e.py and tests/fixtures/kpi_return_rate/.
+job:
+  name: kpi_return_rate
+  description: One row per calendar month and level 1 category, with units sold, units returned, net refunds and return rate.
+  glue:
+    worker_type: G.1X
+    number_of_workers: 2
+  processing:
+    type: lookback        # lookback | backfill; applies to every source's dates
+  sources:
+    - job: fact_order_line
+      alias: fact_order_line
+      allow_empty: false  # true lets this source read no rows without failing the run
+      lookback_days: 77
+    - job: dim_product
+      alias: dim_product
+      allow_empty: false
+      lookback_days: 1095 # full history
+  sink:
+    contract: kpi_return_rate   # the output contract: contracts/kpi_return_rate_data_contract.yaml
+    write_mode: overwrite     # the only mode: replaces the partitions present in the output
+    partition_key: month
+  transformations:
+    - name: select category level
+      description: Keep only product_version_id and category_id_level_1 from dim_product
+      inputs: [dim_product]
+      output:
+        grain_change: false
+        removes_columns: [valid_from, product_id, sku, product_name, brand, category_id, list_price_eur, cost_price_eur, is_active, launched_date, valid_to, is_current, category_id_level_2, category_id_level_3, category_id_level_4]
+    - name: join category data to fact_order_line
+      description: left join product/category information onto fact_order_line data on `product_version_id`. Keep every order line.
+      inputs: [select category level, fact_order_line]
+      depends_on: [select category_level]
+      output:
+        grain_change: false
+    - name: filter completed orders
+      description: Keep rows whose order_status is not "cancelled".
+      inputs: [join category data to fact_order_line]
+      depends_on: [join category data to fact_order_line]
+      output:
+        grain_change: false
+    - name: create month column
+      description: Create a month column, where month = first date of the calendar month, e.g. if the order_date is 2026-02-16, the value of the month column will be 2026-02-01
+      inputs: [filter completed orders]
+      depends_on: [filter completed orders]
+      output:
+        grain_change: false
+        columns:
+          - name: month
+            type: date
+    - name: filter complete months
+      description: Keep the rows whose month is later than or equal to the earliest order_date in the entire DataFrame, so a month the lookback only partly covers is left out.
+      inputs: [create month column]
+      depends_on: [create month column]
+      output:
+        grain_change: false
+    - name: aggregate monthly returns
+      description: >
+          Group by month and category_id_level_1, and aggregate as follows: units_sold is the sum of quantity; units_returned is the sum of returned_quantity; net_refunds_eur is the sum of refund_net_eur.
+      inputs: [filter complete months]
+      depends_on: [filter complete months]
+      output:
+        grain_change: true
+        columns:
+          - name: month
+            type: date
+          - name: category_id_level_1
+            type: string
+          - name: units_sold
+            type: int
+          - name: units_returned
+            type: int
+          - name: net_refunds_eur
+            type: decimal(12,2)
+    - name: create return rate column
+      description: Create a return rate column, where return_rate = units_returned / units_sold; null when units_sold is 0.
+      inputs: [aggregate monthly returns]
+      depends_on: [aggregate monthly returns]
+      output:
+        grain_change: false
+        columns:
+          - name: return_rate
+            type: decimal(5,4)
+    - name: create is_final column
+      description: Create an is_final column. Take max(order_date) from filter completed orders as a single value, and cross join it onto every row of create return rate column. is_final is true when max(order_date) is more than 45 days after the last day of month, otherwise false. Drop the max(order_date) column after creating is_final.
+      inputs: [create return rate column, filter completed orders]
+      depends_on: [create return rate column, filter completed orders]
+      output:
+        grain_change: false
+        removes_columns: [order_date, order_id, line_number, customer_id, session_id, order_ts, order_status, product_id, quantity, unit_price, discount_amount, tax_rate, gross_amount_eur, net_amount_eur, customer_version_id, product_version_id, cost_eur, gross_margin_eur, returned_quantity, refund_net_eur, net_revenue_after_returns_eur, mkt_channel, date_key]
+        columns:
+          - name: is_final
+            type: boolean
