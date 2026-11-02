@@ -52,3 +52,13 @@ variable "tags" {
     ManagedBy   = "terraform"
   }
 }
+
+variable "db_cluster_resource_id" {
+  description = "Resource ID of the shop's Aurora cluster (starts with cluster-), for the extract's rds-db:connect permission."
+  type        = string
+}
+
+variable "db_host" {
+  description = "Writer endpoint of the shop's Aurora cluster, which the extract Lambda reads from."
+  type        = string
+}

@@ -90,3 +90,88 @@ resource "aws_iam_role_policy_attachment" "s3_access" {
   role       = aws_iam_role.glue_execution.name
   policy_arn = aws_iam_policy.s3_access.arn
 }
+
+#-------------------------
+# Extraction IAM role
+#--------------------------
+
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_policy_document" "lambda_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      identifiers = ["lambda.amazonaws.com"]
+      type        = "Service"
+    }
+  }
+}
+
+resource "aws_iam_role" "extract" {
+  name               = "${var.name_prefix}-shop-sim-extract"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
+  tags               = local.common_tags
+}
+
+data "aws_iam_policy_document" "extract" {
+  statement {
+    actions = ["rds-db:connect"]
+    resources = [
+      "arn:aws:rds-db:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:dbuser:${var.db_cluster_resource_id}/${var.db_user}"
+    ]
+  }
+  statement {
+    actions   = ["s3:PutObject"]
+    resources = ["arn:aws:s3:::${var.raw_data_bucket}/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "extract" {
+  name   = "shop-sim-extract"
+  role   = aws_iam_role.extract.id
+  policy = data.aws_iam_policy_document.extract.json
+}
+
+resource "aws_iam_role_policy_attachment" "extract_lambda_basic" {
+  role       = aws_iam_role.extract.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy_attachment" "extract_vpc" {
+  role       = aws_iam_role.extract.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+# ---------------
+# Daily Schedule
+# ---------------
+
+data "aws_iam_policy_document" "scheduler_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["scheduler.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "extract_scheduler" {
+  name               = "${var.name_prefix}-shop-sim-extract-scheduler"
+  assume_role_policy = data.aws_iam_policy_document.scheduler_assume_role.json
+  tags               = local.common_tags
+}
+
+data "aws_iam_policy_document" "extract_scheduler_invoke" {
+  statement {
+    actions   = ["lambda:InvokeFunction"]
+    resources = ["arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:shop-sim-extract"]
+  }
+}
+
+resource "aws_iam_role_policy" "extract_scheduler_invoke" {
+  name   = "shop-sim-extract-invoke"
+  role   = aws_iam_role.extract_scheduler.id
+  policy = data.aws_iam_policy_document.extract_scheduler_invoke.json
+}

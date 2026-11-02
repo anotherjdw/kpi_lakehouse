@@ -20,3 +20,7 @@ tags = {
   Environment = "prod"
   ManagedBy   = "terraform"
 }
+
+db_cluster_resource_id = "cluster-JQKP36472IYVAEQUU7VJ2VSLVA"
+
+db_host = "shop-sim.cluster-cvekg644yyid.eu-central-1.rds.amazonaws.com"

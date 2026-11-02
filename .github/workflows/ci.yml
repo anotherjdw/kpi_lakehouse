@@ -125,7 +125,7 @@ jobs:
 
       - name: Terraform plan
         working-directory: infra/terraform
-        run: terraform plan -out=tfplan
+        run: terraform plan -var-file=env.tfvars -out=tfplan
 
       - name: Render plan text
         working-directory: infra/terraform

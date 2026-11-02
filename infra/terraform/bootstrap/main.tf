@@ -179,6 +179,21 @@ data "aws_iam_policy_document" "plan_permissions" {
     actions   = ["s3:ListBucket"]
     resources = [local.state_bucket_arn]
   }
+
+  # The shop extract: VPC, subnet and security-group lookups, and refreshing
+  # the extract Lambda and its schedule. Read-only.
+  statement {
+    sid    = "ReadShopExtract"
+    effect = "Allow"
+    actions = [
+      "ec2:Describe*",
+      "lambda:Get*",
+      "lambda:List*",
+      "scheduler:Get*",
+      "scheduler:List*",
+    ]
+    resources = ["*"]
+  }
 }
 
 data "aws_iam_policy_document" "deploy_permissions" {
@@ -245,6 +260,9 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "iam:DetachRolePolicy",
       "iam:ListAttachedRolePolicies",
       "iam:ListRolePolicies",
+      "iam:PutRolePolicy",
+      "iam:GetRolePolicy",
+      "iam:DeleteRolePolicy",
       "iam:ListInstanceProfilesForRole",
     ]
     resources = [
@@ -333,6 +351,42 @@ data "aws_iam_policy_document" "deploy_permissions" {
     sid       = "GlueReadForRefresh"
     effect    = "Allow"
     actions   = ["glue:GetJobs", "glue:ListJobs"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "ManageShopExtractLambda"
+    effect = "Allow"
+    actions = [
+      "lambda:CreateFunction",
+      "lambda:DeleteFunction",
+      "lambda:UpdateFunctionCode",
+      "lambda:UpdateFunctionConfiguration",
+      "lambda:TagResource",
+      "lambda:UntagResource",
+      "lambda:Get*",
+      "lambda:List*",
+    ]
+    resources = ["arn:aws:lambda:*:${local.account_id}:function:shop-sim-extract"]
+  }
+
+  statement {
+    sid    = "ManageShopExtractSchedule"
+    effect = "Allow"
+    actions = [
+      "scheduler:CreateSchedule",
+      "scheduler:UpdateSchedule",
+      "scheduler:DeleteSchedule",
+      "scheduler:GetSchedule",
+    ]
+    resources = ["arn:aws:scheduler:*:${local.account_id}:schedule/default/shop-sim-extract-daily"]
+  }
+
+  # The VPC lookups, and Lambda checking the function's subnets and security group.
+  statement {
+    sid       = "DescribeNetworkForExtract"
+    effect    = "Allow"
+    actions   = ["ec2:Describe*"]
     resources = ["*"]
   }
 }

@@ -40,6 +40,8 @@ module "iam" {
   processed_bucket_arn    = module.s3.bucket_arns["processed"]
   scripts_bucket_arn      = module.s3.bucket_arns["scripts"]
   tags                    = var.tags
+  raw_data_bucket         = module.s3.bucket_names["raw"]
+  db_cluster_resource_id  = var.db_cluster_resource_id
 }
 
 module "catalog" {
@@ -707,4 +709,37 @@ module "glue" {
   # <<< AMEND:JOBS
   # END ETL jobs and triggers
   # ---------------------------------------------------------------------------
+}
+# --------------------------------------------------------------------------------------
+# Shop extract: Postgres -> raw layer, daily (network from the console-built shop setup)
+# --------------------------------------------------------------------------------------
+
+data "aws_vpc" "default" {
+  default = true
+}
+
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+data "aws_security_group" "shop_sim_lambda" {
+  name   = "shop-sim-lambda"
+  vpc_id = data.aws_vpc.default.id
+}
+
+module "lambda" {
+  source = "./modules/lambda"
+
+  environment        = var.environment
+  role_arn           = module.iam.extract_role_arn
+  scheduler_role_arn = module.iam.extract_scheduler_role_arn
+  scripts_bucket     = module.s3.bucket_names["scripts"]
+  data_bucket        = module.s3.bucket_names["raw"]
+  db_host            = var.db_host
+  subnet_ids         = data.aws_subnets.default.ids
+  security_group_ids = [data.aws_security_group.shop_sim_lambda.id]
+  tags               = var.tags
 }

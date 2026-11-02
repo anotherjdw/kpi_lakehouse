@@ -9,3 +9,13 @@ output "glue_execution_role_name" {
   description = "Name of the Glue execution role."
   value       = aws_iam_role.glue_execution.name
 }
+
+output "extract_role_arn" {
+  description = "ARN of the IAM Role for the extract Lambda function."
+  value       = aws_iam_role.extract.arn
+}
+
+output "extract_scheduler_role_arn" {
+  description = "ARN of the role EventBridge Scheduler assumes to invoke the extract Lambda."
+  value       = aws_iam_role.extract_scheduler.arn
+}

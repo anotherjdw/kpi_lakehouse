@@ -35,3 +35,19 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "raw_data_bucket" {
+  description = "Bucket holding the raw layer (<BUCKET> in the setup guide)"
+  type        = string
+}
+
+variable "db_cluster_resource_id" {
+  description = "Aurora cluster resource ID, starts with cluster-"
+  type        = string
+}
+
+variable "db_user" {
+  description = "Postgres user the extract logs in as with IAM auth"
+  type        = string
+  default     = "simulator"
+}

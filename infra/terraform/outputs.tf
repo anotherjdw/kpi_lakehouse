@@ -25,3 +25,13 @@ output "glue_job_names" {
   description = "Map of ETL job key to full Glue job name for kpi_lakehouse."
   value       = module.glue.job_names
 }
+
+output "extract_function_name" {
+  description = "Name of the Lambda function that extracts the shop database to the raw bucket."
+  value       = module.lambda.extract_function_name
+}
+
+output "extract_schedule_arn" {
+  description = "ARN of the EventBridge Scheduler schedule that runs the extract daily."
+  value       = module.lambda.extract_schedule_arn
+}
