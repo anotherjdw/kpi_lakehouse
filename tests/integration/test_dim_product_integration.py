@@ -44,7 +44,7 @@ SOURCES = {
         rows=inputs.CATEGORIES_ROWS,
         schema=schema_definitions.categories_schema,
         file_format="parquet",
-        partition_key="snapshot_date",
+        partition_key=None,
     ),
 }
 

@@ -4,15 +4,11 @@ contract:
   layer: preprocessed
   dataset: category
   description: Internal flattened catalog of product categories.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
+  # table: hive               # a Hive table over this dataset; needs sink.partition_key and
                             # snake_case dataset and column names
   grain:
     unique_key: [category_id]
   schema:
-    - name: snapshot_date
-      type: date
-      nullable: false
-      description: "Date the snapshot reflects. Partition column."
     - name: category_id
       type: string
       nullable: false

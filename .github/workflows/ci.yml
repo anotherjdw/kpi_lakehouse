@@ -80,6 +80,7 @@ jobs:
           cd src && find kpi_lakehouse -type f \
             -not -path '*/__pycache__/*' \
             -not -path 'kpi_lakehouse/contracts/*' \
+            -not -path 'kpi_lakehouse/lambdas/*' \
             -not \( -path '*/jobs/*' -name '*.yaml' \) \
             | zip -q -X "$GITHUB_WORKSPACE/lib/kpi_lakehouse.zip" -@
 
@@ -123,6 +124,16 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           backend: "true"
 
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      # Terraform uploads this zip and deploys the Lambda functions from it, so it must exist
+      # before the plan; apply then uses this same file, from the lambda-zip artifact.
+      - name: Build Lambda zip
+        run: ./scripts/build_lambda.sh
+
       - name: Terraform plan
         working-directory: infra/terraform
         run: terraform plan -var-file=env.tfvars -out=tfplan
@@ -155,6 +166,14 @@ jobs:
           path: infra/terraform/tfplan
           retention-days: 1
 
+      - name: Upload Lambda zip artifact
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lambda-zip
+          path: build/lambdas.zip
+          retention-days: 1
+
   apply:
     name: Terraform apply
     needs: plan
@@ -183,6 +202,12 @@ jobs:
         with:
           name: tfplan
           path: infra/terraform
+
+      - name: Download Lambda zip artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lambda-zip
+          path: build
 
       - name: Terraform apply
         working-directory: infra/terraform
@@ -219,6 +244,7 @@ jobs:
           cd src && find kpi_lakehouse -type f \
             -not -path '*/__pycache__/*' \
             -not -path 'kpi_lakehouse/contracts/*' \
+            -not -path 'kpi_lakehouse/lambdas/*' \
             -not \( -path '*/jobs/*' -name '*.yaml' \) \
             | zip -q -X "$GITHUB_WORKSPACE/lib/kpi_lakehouse.zip" -@
 

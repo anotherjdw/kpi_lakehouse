@@ -4,7 +4,6 @@ contract:
   layer: raw                  # raw | preprocessed | processed
   dataset: categories
   file_format: json
-  partition_key: snapshot_date
   description: >
     Full export of the category tree as parent/child pairs, overwritten on every export. The tree
     is up to four levels deep; root categories have no parent.
@@ -17,10 +16,6 @@ contract:
   grain:
     unique_key: [category_id]
   schema:
-    - name: snapshot_date
-      type: date
-      nullable: false
-      description: "Date the snapshot reflects. Partition column."
     - name: category_id
       type: string
       nullable: false

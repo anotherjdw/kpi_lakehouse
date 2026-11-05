@@ -21,12 +21,6 @@ def run() -> None:
             start_date=args.PRODUCTS_START_DATE,
             end_date=args.PRODUCTS_END_DATE,
         ),
-        "categories": resolve_processing_dates(
-            processing_type=args.PROCESSING_TYPE,
-            lookback_days=args.CATEGORIES_LOOKBACK_DAYS,
-            start_date=args.CATEGORIES_START_DATE,
-            end_date=args.CATEGORIES_END_DATE,
-        ),
     }
     with job_run("dim_product", args, processing_dates) as record:
         with phase(record, "read"):

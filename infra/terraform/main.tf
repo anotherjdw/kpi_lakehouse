@@ -55,25 +55,6 @@ module "catalog" {
   # BEGIN Hive tables (managed by engineering-automation -- do not edit by hand)
   # >>> AMEND:TABLES
   tables = {
-    "preprocessed/category" = {
-      layer       = "preprocessed"
-      dataset     = "category"
-      description = "Internal flattened catalog of product categories."
-      partition_keys = [
-        { name = "snapshot_date", type = "date", comment = "Date the snapshot reflects. Partition column." },
-      ]
-      columns = [
-        { name = "category_id", type = "string", nullable = false, comment = "Natural key of the category." },
-        { name = "category_name", type = "string", nullable = false, comment = "Display name, e.g. Running Shoes." },
-        { name = "parent_category_id", type = "string", nullable = true, comment = "category_id of the parent. Null for a root category." },
-        { name = "is_active", type = "boolean", nullable = false, comment = "False once the category is retired; retired categories stay for history." },
-        { name = "updated_at", type = "timestamp", nullable = false, comment = "Time the category was last changed (UTC)." },
-        { name = "category_id_level_1", type = "string", nullable = false, comment = "First level parent category of the category_id." },
-        { name = "category_id_level_2", type = "string", nullable = true, comment = "Second level parent category of the category_id." },
-        { name = "category_id_level_3", type = "string", nullable = true, comment = "Third level parent category of the category_id." },
-        { name = "category_id_level_4", type = "string", nullable = true, comment = "Fourth level parent category of the category_id." },
-      ]
-    }
     "preprocessed/customers" = {
       layer       = "preprocessed"
       dataset     = "customers"
@@ -438,11 +419,9 @@ module "glue" {
         worker_type       = "G.1X"
       }
       arguments = {
-        CATEGORIES_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/categories/"
-        CATEGORIES_LOOKBACK_DAYS = "1"
-        OUTPUT_PATH              = "s3://${module.s3.bucket_names["preprocessed"]}/category/"
-        OUTPUT_TABLE             = "${module.catalog.table_names["preprocessed/category"]}"
-        PROCESSING_TYPE          = "lookback"
+        CATEGORIES_INPUT_PATH = "s3://${module.s3.bucket_names["raw"]}/categories/"
+        OUTPUT_PATH           = "s3://${module.s3.bucket_names["preprocessed"]}/category/"
+        PROCESSING_TYPE       = "backfill"
       }
     }
     customers = {
@@ -488,13 +467,12 @@ module "glue" {
         worker_type       = "G.1X"
       }
       arguments = {
-        CATEGORIES_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/category/"
-        CATEGORIES_LOOKBACK_DAYS = "1"
-        OUTPUT_PATH              = "s3://${module.s3.bucket_names["processed"]}/dim_product/"
-        OUTPUT_TABLE             = "${module.catalog.table_names["processed/dim_product"]}"
-        PROCESSING_TYPE          = "lookback"
-        PRODUCTS_INPUT_PATH      = "s3://${module.s3.bucket_names["preprocessed"]}/products/"
-        PRODUCTS_LOOKBACK_DAYS   = "1095"
+        CATEGORIES_INPUT_PATH  = "s3://${module.s3.bucket_names["preprocessed"]}/category/"
+        OUTPUT_PATH            = "s3://${module.s3.bucket_names["processed"]}/dim_product/"
+        OUTPUT_TABLE           = "${module.catalog.table_names["processed/dim_product"]}"
+        PROCESSING_TYPE        = "lookback"
+        PRODUCTS_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/products/"
+        PRODUCTS_LOOKBACK_DAYS = "1095"
       }
     }
     fact_order_line = {
@@ -742,4 +720,5 @@ module "lambda" {
   subnet_ids         = data.aws_subnets.default.ids
   security_group_ids = [data.aws_security_group.shop_sim_lambda.id]
   tags               = var.tags
+  package_path       = "${path.root}/../../build/lambdas.zip"
 }

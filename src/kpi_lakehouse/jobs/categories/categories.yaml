@@ -10,17 +10,15 @@ job:
     worker_type: G.1X
     number_of_workers: 2
   processing:
-    type: lookback        # lookback | backfill; applies to every source's dates
+    type: backfill        # lookback | backfill; applies to every source's dates
     # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
   sources:
     - contract: categories_raw
       alias: categories
       allow_empty: false  # true lets this source read no rows without failing the run
-      lookback_days: 1    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
   sink:
     contract: categories   # the output contract: contracts/categories_data_contract.yaml
     write_mode: overwrite     # the only mode: replaces the partitions present in the output
-    partition_key: snapshot_date
   transformations:
     - name: flatten category tree
       description: >

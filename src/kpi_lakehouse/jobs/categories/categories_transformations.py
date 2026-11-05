@@ -10,7 +10,6 @@ import argparse
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from kpi_lakehouse.utils.catalog import register_partitions
 from kpi_lakehouse.utils.dataframes import (
     create_pyspark_dataframe,
     validate_pyspark_dataframe,
@@ -30,8 +29,8 @@ def flatten_category_tree(categories: DataFrame) -> DataFrame:
 
     Args:
         categories: DataFrame containing category hierarchy data with columns
-            snapshot_date, category_id, category_name, parent_category_id,
-            is_active, and updated_at.
+            category_id, category_name, parent_category_id, is_active, and
+            updated_at.
 
     Returns:
         DataFrame with the original columns plus category_id_level_1 through
@@ -98,7 +97,6 @@ def flatten_category_tree(categories: DataFrame) -> DataFrame:
         .alias("category_id_level_4"),
     )
     result = categories.join(levels, categories["category_id"] == levels["id"], "left").select(
-        F.col("snapshot_date"),
         F.col("category_id"),
         F.col("category_name"),
         F.col("parent_category_id"),
@@ -117,11 +115,7 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument("--CATEGORIES_INPUT_PATH", type=str)
     parser.add_argument("--OUTPUT_PATH", type=str)
-    parser.add_argument("--OUTPUT_TABLE", type=str)
     parser.add_argument("--PROCESSING_TYPE", type=str)
-    parser.add_argument("--CATEGORIES_LOOKBACK_DAYS", type=int)
-    parser.add_argument("--CATEGORIES_START_DATE", type=str)
-    parser.add_argument("--CATEGORIES_END_DATE", type=str)
     parser.add_argument("--JOB_NAME", type=str)
     parser.add_argument("--JOB_RUN_ID", type=str)
     parser.add_argument("--environment", type=str)
@@ -137,14 +131,11 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             file_path=args.CATEGORIES_INPUT_PATH,
             schema=schema_definitions.categories_raw_schema,
             file_format="json",
-            date_ranges=processing_dates["categories"],
-            partition_key="snapshot_date",
         ),
     }
     if sources["categories"].isEmpty():
         raise ValueError(
-            f"Source 'categories' read no rows for "
-            f"{processing_dates['categories']}. "
+            "Source 'categories' read no rows from its whole dataset. "
             "To allow this, set allow_empty: true on this source in "
             "categories.yaml."
         )
@@ -157,8 +148,8 @@ def transform(categories: DataFrame) -> DataFrame:
     return flatten_category_tree_result
 
 
-def write(output: DataFrame, output_file_path: str, output_table: str) -> None:
-    """Check the output against its contract, write it as parquet, then register its partitions."""
+def write(output: DataFrame, output_file_path: str) -> None:
+    """Check the output against its contract, then write it as parquet."""
     output = output.persist()
     try:
         validate_pyspark_dataframe(
@@ -170,14 +161,7 @@ def write(output: DataFrame, output_file_path: str, output_table: str) -> None:
             output_dataframe=output,
             output_file_path=output_file_path,
             file_format="parquet",
-            partition_key="snapshot_date",
-        )
-        # Register after a successful write, while the DataFrame is still cached.
-        register_partitions(
-            data=output,
-            table=output_table,
-            partition_key="snapshot_date",
-            output_file_path=output_file_path,
+            partition_key=None,
         )
     finally:
         output.unpersist()

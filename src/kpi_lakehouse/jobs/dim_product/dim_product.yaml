@@ -19,7 +19,6 @@ job:
     - job: categories
       alias: categories
       allow_empty: false
-      lookback_days: 1
   sink:
     contract: dim_product   # the output contract: contracts/dim_product_data_contract.yaml
     write_mode: overwrite     # the only mode: replaces the partitions present in the output
@@ -44,18 +43,12 @@ job:
         columns:
           - name: is_current
             type: boolean
-    - name: filter latest category snapshot
-      description: Keep only the categories rows whose snapshot_date is the latest snapshot_date in the DataFrame.
+    - name: select category path dimensions
+      description: Select category_id, category_id_level_1, category_id_level_2, category_id_level_3 and category_id_level_4.
       inputs: [categories]
       output:
         grain_change: false
-    - name: select category path dimensions
-      description: Select category_id, category_id_level_1, category_id_level_2, category_id_level_3 and category_id_level_4.
-      inputs: [filter latest category snapshot]
-      depends_on: [filter latest category snapshot]
-      output:
-        grain_change: false
-        removes_columns: [snapshot_date, category_name, parent_category_id, is_active, updated_at]
+        removes_columns: [category_name, parent_category_id, is_active, updated_at]
     - name: join category path
       description: left join categories data onto products data on `category_id`. Keep every product row, including any whose category_id has no match.
       inputs: [ create is_current flag, select category path dimensions ]

@@ -13,7 +13,6 @@ from pyspark.sql.types import (
     StringType,
     StructField,
     StructType,
-    TimestampType,
 )
 
 from kpi_lakehouse.jobs.dim_product import (
@@ -45,21 +44,6 @@ CREATE_VALID_TO_COLUMN_SCHEMA = StructType(
         StructField("valid_from", DateType(), nullable=True),
         StructField("product_version_id", StringType(), nullable=True),
         StructField("valid_to", DateType(), nullable=True),
-    ]
-)
-
-FILTER_LATEST_CATEGORY_SNAPSHOT_SCHEMA = StructType(
-    [
-        StructField("snapshot_date", DateType(), nullable=True),
-        StructField("category_id", StringType(), nullable=True),
-        StructField("category_name", StringType(), nullable=True),
-        StructField("parent_category_id", StringType(), nullable=True),
-        StructField("is_active", BooleanType(), nullable=True),
-        StructField("updated_at", TimestampType(), nullable=True),
-        StructField("category_id_level_1", StringType(), nullable=True),
-        StructField("category_id_level_2", StringType(), nullable=True),
-        StructField("category_id_level_3", StringType(), nullable=True),
-        StructField("category_id_level_4", StringType(), nullable=True),
     ]
 )
 
@@ -121,35 +105,6 @@ def test_create_valid_to_column(spark: SparkSession) -> None:
     assert sorted(actual, key=row_key) == sorted(expected_rows, key=row_key)
 
 
-def test_filter_latest_category_snapshot(spark: SparkSession) -> None:
-    """filter_latest_category_snapshot returns exactly its reviewed expected rows."""
-    assert inputs.FLATTEN_CATEGORY_TREE_REVIEWED, review_message(
-        "categories",
-        "FLATTEN_CATEGORY_TREE",
-    )
-    assert inputs.CREATE_PRODUCT_VERSION_ID_REVIEWED, review_message(
-        "products",
-        "CREATE_PRODUCT_VERSION_ID",
-    )
-    assert expected.FILTER_LATEST_CATEGORY_SNAPSHOT_REVIEWED, review_message(
-        "dim_product",
-        "FILTER_LATEST_CATEGORY_SNAPSHOT",
-    )
-    df_actual = job.filter_latest_category_snapshot(
-        rows_to_df(spark, inputs.CATEGORIES_ROWS, schema_definitions.categories_schema),
-    )
-    df_expected = rows_to_df(
-        spark,
-        expected.FILTER_LATEST_CATEGORY_SNAPSHOT_ROWS,
-        FILTER_LATEST_CATEGORY_SNAPSHOT_SCHEMA,
-    )
-    columns = df_expected.columns
-    assert column_types(df_actual.schema) == column_types(df_expected.schema)
-    actual = df_actual.select(columns).collect()
-    expected_rows = df_expected.collect()
-    assert sorted(actual, key=row_key) == sorted(expected_rows, key=row_key)
-
-
 def test_create_is_current_flag(spark: SparkSession) -> None:
     """create_is_current_flag returns exactly its reviewed expected rows."""
     assert inputs.FLATTEN_CATEGORY_TREE_REVIEWED, review_message(
@@ -194,11 +149,7 @@ def test_select_category_path_dimensions(spark: SparkSession) -> None:
         "SELECT_CATEGORY_PATH_DIMENSIONS",
     )
     df_actual = job.select_category_path_dimensions(
-        rows_to_df(
-            spark,
-            expected.FILTER_LATEST_CATEGORY_SNAPSHOT_ROWS,
-            FILTER_LATEST_CATEGORY_SNAPSHOT_SCHEMA,
-        ),
+        rows_to_df(spark, inputs.CATEGORIES_ROWS, schema_definitions.categories_schema),
     )
     df_expected = rows_to_df(
         spark,

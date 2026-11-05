@@ -11,16 +11,20 @@ locals {
 # Extract Lambda function
 # -----------------------
 
-# Read the uploaded zip's version, so a new upload under the same key redeploys the function.
-data "aws_s3_object" "package" {
-  bucket = var.scripts_bucket
-  key    = var.package_key
+# Upload the zip scripts/build_lambda.sh built. source_hash changes only when the contents do,
+# so a changed zi is uploaded as a new object version, which redeploys the function.
+
+resource "aws_s3_object" "package" {
+  bucket      = var.scripts_bucket
+  key         = var.package_key
+  source      = var.package_path
+  source_hash = filemd5(var.package_path)
 }
 
 resource "aws_lambda_function" "extract" {
   function_name = "shop-sim-extract"
   role          = var.role_arn
-  handler       = "shop_simulator.extract.handler"
+  handler       = "kpi_lakehouse.lambdas.shop_sim_extract.handler.handler"
   runtime       = "python3.12"
   architectures = ["x86_64"]
   memory_size   = 512
@@ -28,7 +32,7 @@ resource "aws_lambda_function" "extract" {
 
   s3_bucket         = var.scripts_bucket
   s3_key            = var.package_key
-  s3_object_version = data.aws_s3_object.package.version_id
+  s3_object_version = aws_s3_object.package.version_id
 
   environment {
     variables = {

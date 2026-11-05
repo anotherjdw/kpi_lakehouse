@@ -24,7 +24,12 @@ variable "scripts_bucket" {
 variable "package_key" {
   description = "S3 key of the Lambda zip in the scripts bucket."
   type        = string
-  default     = "lambda/shop_simulator_lambda.zip"
+  default     = "lambda/lambdas.zip"
+}
+
+variable "package_path" {
+  description = "Local path of the zip scripts/build_lambda.sh builds (build/lambdas.zip)"
+  type        = string
 }
 
 variable "data_bucket" {

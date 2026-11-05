@@ -227,6 +227,7 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "s3:PutBucketPolicy",
       "s3:DeleteBucketPolicy",
       "s3:PutObject",
+      "s3:PutObjectTagging",
       "s3:GetObject",
       "s3:DeleteObject",
     ]

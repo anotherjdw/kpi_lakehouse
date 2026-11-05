@@ -15,7 +15,6 @@ from pyspark.sql import Row
 FLATTEN_CATEGORY_TREE_REVIEWED = True
 FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0001",
         category_name="Women",
         parent_category_id=None,
@@ -27,7 +26,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0002",
         category_name="Clothing",
         parent_category_id="CAT-0001",
@@ -39,7 +37,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0004",
         category_name="Tops",
         parent_category_id="CAT-0002",
@@ -51,7 +48,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0014",
         category_name="Men",
         parent_category_id=None,
@@ -63,7 +59,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0015",
         category_name="Clothing",
         parent_category_id="CAT-0014",
@@ -75,7 +70,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0017",
         category_name="T-Shirts",
         parent_category_id="CAT-0015",
@@ -87,7 +81,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0023",
         category_name="Kids",
         parent_category_id=None,
@@ -99,7 +92,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0024",
         category_name="Girls",
         parent_category_id="CAT-0023",
@@ -111,7 +103,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0025",
         category_name="Girls Clothing",
         parent_category_id="CAT-0024",
@@ -123,7 +114,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0030",
         category_name="Sport",
         parent_category_id=None,
@@ -135,7 +125,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0031",
         category_name="Running",
         parent_category_id="CAT-0030",
@@ -147,7 +136,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0035",
         category_name="Running Apparel",
         parent_category_id="CAT-0031",
@@ -159,7 +147,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0036",
         category_name="Running Shirts",
         parent_category_id="CAT-0035",
@@ -171,7 +158,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4="CAT-0036",
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0038",
         category_name="Fitness",
         parent_category_id="CAT-0030",
@@ -183,7 +169,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0039",
         category_name="Yoga Mats",
         parent_category_id="CAT-0038",
@@ -195,7 +180,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0044",
         category_name="Home",
         parent_category_id=None,
@@ -207,7 +191,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0045",
         category_name="Kitchen",
         parent_category_id="CAT-0044",
@@ -219,7 +202,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0047",
         category_name="Knives",
         parent_category_id="CAT-0045",
@@ -231,7 +213,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0048",
         category_name="Living",
         parent_category_id="CAT-0044",
@@ -243,7 +224,6 @@ FLATTEN_CATEGORY_TREE_ROWS: list[Row] = [
         category_id_level_4=None,
     ),
     Row(
-        snapshot_date=date(2026, 10, 18),
         category_id="CAT-0049",
         category_name="Cushions",
         parent_category_id="CAT-0048",

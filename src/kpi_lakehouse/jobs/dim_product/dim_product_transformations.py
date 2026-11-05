@@ -40,22 +40,6 @@ def create_valid_to_column(products: DataFrame) -> DataFrame:
     return products.withColumn("valid_to", F.lead(F.col("valid_from")).over(window))
 
 
-def filter_latest_category_snapshot(categories: DataFrame) -> DataFrame:
-    """Filter categories to retain only rows from the latest snapshot date.
-
-    Args:
-        categories: DataFrame containing category snapshot data with a
-            snapshot_date column used to identify the most recent snapshot.
-
-    Returns:
-        DataFrame containing only the rows whose snapshot_date equals the
-        maximum snapshot_date present in the input DataFrame, with the same
-        schema as the input.
-    """
-    max_snapshot_date = categories.agg(F.max("snapshot_date")).collect()[0][0]
-    return categories.filter(F.col("snapshot_date") == max_snapshot_date)
-
-
 def create_is_current_flag(create_valid_to_column_result: DataFrame) -> DataFrame:
     """Creates an is_current boolean flag based on the valid_to column.
 
@@ -86,17 +70,16 @@ def create_is_current_flag(create_valid_to_column_result: DataFrame) -> DataFram
     )
 
 
-def select_category_path_dimensions(filter_latest_category_snapshot_result: DataFrame) -> DataFrame:
-    """Select category path dimension columns from the category snapshot DataFrame.
+def select_category_path_dimensions(categories: DataFrame) -> DataFrame:
+    """Select category path dimension columns from the categories DataFrame.
 
     Args:
-        filter_latest_category_snapshot_result: DataFrame containing category snapshot data
-            with hierarchical level columns.
+        categories: DataFrame containing category data with hierarchical level columns.
 
     Returns:
         DataFrame containing only category_id and its four hierarchical level columns.
     """
-    return filter_latest_category_snapshot_result.select(
+    return categories.select(
         F.col("category_id"),
         F.col("category_id_level_1"),
         F.col("category_id_level_2"),
@@ -154,9 +137,6 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--PRODUCTS_LOOKBACK_DAYS", type=int)
     parser.add_argument("--PRODUCTS_START_DATE", type=str)
     parser.add_argument("--PRODUCTS_END_DATE", type=str)
-    parser.add_argument("--CATEGORIES_LOOKBACK_DAYS", type=int)
-    parser.add_argument("--CATEGORIES_START_DATE", type=str)
-    parser.add_argument("--CATEGORIES_END_DATE", type=str)
     parser.add_argument("--JOB_NAME", type=str)
     parser.add_argument("--JOB_RUN_ID", type=str)
     parser.add_argument("--environment", type=str)
@@ -180,8 +160,6 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             file_path=args.CATEGORIES_INPUT_PATH,
             schema=schema_definitions.categories_schema,
             file_format="parquet",
-            date_ranges=processing_dates["categories"],
-            partition_key="snapshot_date",
         ),
     }
     if sources["products"].isEmpty():
@@ -193,8 +171,7 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
         )
     if sources["categories"].isEmpty():
         raise ValueError(
-            f"Source 'categories' read no rows for "
-            f"{processing_dates['categories']}. "
+            "Source 'categories' read no rows from its whole dataset. "
             "To allow this, set allow_empty: true on this source in "
             "dim_product.yaml."
         )
@@ -204,11 +181,8 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
 def transform(products: DataFrame, categories: DataFrame) -> DataFrame:
     """Run the transformations in dependency order and return the job's output."""
     create_valid_to_column_result = create_valid_to_column(products)
-    filter_latest_category_snapshot_result = filter_latest_category_snapshot(categories)
     create_is_current_flag_result = create_is_current_flag(create_valid_to_column_result)
-    select_category_path_dimensions_result = select_category_path_dimensions(
-        filter_latest_category_snapshot_result,
-    )
+    select_category_path_dimensions_result = select_category_path_dimensions(categories)
     join_category_path_result = join_category_path(
         create_is_current_flag_result,
         select_category_path_dimensions_result,

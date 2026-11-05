@@ -18,7 +18,6 @@ from pyspark.sql.types import (
 
 categories_schema = StructType(
     [
-        StructField("snapshot_date", DateType(), nullable=False),
         StructField("category_id", StringType(), nullable=False),
         StructField("category_name", StringType(), nullable=False),
         StructField("parent_category_id", StringType(), nullable=True),
@@ -33,7 +32,6 @@ categories_schema = StructType(
 
 categories_raw_schema = StructType(
     [
-        StructField("snapshot_date", DateType(), nullable=False),
         StructField("category_id", StringType(), nullable=False),
         StructField("category_name", StringType(), nullable=False),
         StructField("parent_category_id", StringType(), nullable=True),

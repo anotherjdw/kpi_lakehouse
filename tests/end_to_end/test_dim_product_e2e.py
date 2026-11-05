@@ -48,7 +48,7 @@ SOURCES = {
         rows=inputs.CATEGORIES_ROWS,
         schema=schema_definitions.categories_schema,
         file_format="parquet",
-        partition_key="snapshot_date",
+        partition_key=None,
     ),
 }
 
@@ -98,10 +98,6 @@ def test_run_end_to_end(
         dates["products"][0],
         "--PRODUCTS_END_DATE",
         dates["products"][-1],
-        "--CATEGORIES_START_DATE",
-        dates["categories"][0],
-        "--CATEGORIES_END_DATE",
-        dates["categories"][-1],
     ]
     monkeypatch.setattr(sys, "argv", argv)
     job.run()
