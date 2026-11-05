@@ -2,9 +2,10 @@
 # Glue ETL jobs for this data product. One aws_glue_job resource is created per
 # entry in var.jobs via for_each. Job scripts are read from the scripts bucket at
 # s3://{scripts_bucket_name}/scripts/{job_name}/{job_name}.py
-# A job at the start of a chain may run on a schedule (var.scheduled_triggers);
-# a job reading another job's output runs when that job succeeds
-# (var.conditional_triggers). Every job runs with the Glue Data Catalog as its
+# Jobs that run together belong to one Glue workflow (var.workflows): its
+# scheduled trigger starts the jobs with no upstream job, and a job reading other
+# jobs' outputs runs once every one of them has succeeded in the same workflow
+# run (var.conditional_triggers). Every job runs with the Glue Data Catalog as its
 # Spark catalog (--enable-glue-datacatalog), where a job whose output has a Hive
 # table registers the partitions it wrote.
 
@@ -52,15 +53,26 @@ resource "aws_glue_job" "etl" {
   tags = local.common_tags
 }
 
+resource "aws_glue_workflow" "etl" {
+  for_each            = var.workflows
+  name                = "${var.name_prefix}-${each.key}"
+  max_concurrent_runs = 1
+  tags                = local.common_tags
+}
+
 resource "aws_glue_trigger" "scheduled" {
-  for_each = var.scheduled_triggers
+  for_each = var.workflows
 
-  name     = "${var.name_prefix}-${each.key}-scheduled"
-  type     = "SCHEDULED"
-  schedule = each.value
+  name          = "${var.name_prefix}-${each.key}-scheduled"
+  type          = "SCHEDULED"
+  schedule      = each.value.schedule
+  workflow_name = aws_glue_workflow.etl[each.key].name
 
-  actions {
-    job_name = aws_glue_job.etl[each.key].name
+  dynamic "actions" {
+    for_each = each.value.jobs
+    content {
+      job_name = aws_glue_job.etl[actions.value].name
+    }
   }
 
   tags = local.common_tags
@@ -69,13 +81,19 @@ resource "aws_glue_trigger" "scheduled" {
 resource "aws_glue_trigger" "conditional" {
   for_each = var.conditional_triggers
 
-  name = "${var.name_prefix}-${each.key}-after-${each.value}"
-  type = "CONDITIONAL"
+  name          = "${var.name_prefix}-${each.key}-conditional"
+  type          = "CONDITIONAL"
+  workflow_name = aws_glue_workflow.etl[each.value.workflow].name
 
   predicate {
-    conditions {
-      job_name = aws_glue_job.etl[each.value].name
-      state    = "SUCCEEDED"
+    logical = "AND"
+
+    dynamic "conditions" {
+      for_each = each.value.upstream
+      content {
+        job_name = aws_glue_job.etl[conditions.value].name
+        state    = "SUCCEEDED"
+      }
     }
   }
 

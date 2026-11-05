@@ -26,12 +26,13 @@ locals {
   state_objects_arn = "arn:aws:s3:::${var.tfstate_bucket}/${var.data_product}/*"
 
   # Main-stack resources, scoped by the shared name prefix.
-  account_id       = data.aws_caller_identity.current.account_id
-  project_role     = "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*"
-  project_policy   = "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*"
-  project_buckets  = "arn:aws:s3:::${local.bucket_prefix}-*"
-  project_jobs     = "arn:aws:glue:*:${local.account_id}:job/${local.name_prefix}-*"
-  project_triggers = "arn:aws:glue:*:${local.account_id}:trigger/${local.name_prefix}-*"
+  account_id        = data.aws_caller_identity.current.account_id
+  project_role      = "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*"
+  project_policy    = "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*"
+  project_buckets   = "arn:aws:s3:::${local.bucket_prefix}-*"
+  project_jobs      = "arn:aws:glue:*:${local.account_id}:job/${local.name_prefix}-*"
+  project_triggers  = "arn:aws:glue:*:${local.account_id}:trigger/${local.name_prefix}-*"
+  project_workflows = "arn:aws:glue:*:${local.account_id}:workflow/${local.name_prefix}-*"
 
   # Catalog names hold no hyphens: a layer's database is named after its bucket with
   # "-" turned into "_" (modules/catalog in the main stack).
@@ -302,6 +303,21 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "glue:GetTags",
     ]
     resources = [local.project_triggers]
+  }
+
+  statement {
+    sid    = "ManageGlueWorkflows"
+    effect = "Allow"
+    actions = [
+      "glue:CreateWorkflow",
+      "glue:UpdateWorkflow",
+      "glue:DeleteWorkflow",
+      "glue:GetWorkflow",
+      "glue:TagResource",
+      "glue:UntagResource",
+      "glue:GetTags"
+    ]
+    resources = [local.project_workflows]
   }
 
   # Each catalog action needs permission on its resource and every resource above it:

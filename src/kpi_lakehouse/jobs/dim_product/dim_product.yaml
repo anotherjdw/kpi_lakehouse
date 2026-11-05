@@ -8,14 +8,14 @@ job:
   description: Dimension table containing key information about the product catalog and the category hierarchy of products.
   glue:
     worker_type: G.1X
-    number_of_workers: 2
+    number_of_workers: 5
   processing:
     type: lookback        # lookback | backfill; applies to every source's dates
   sources:
     - job: products
       alias: products
       allow_empty: false
-      lookback_days: 1095 # full history
+      lookback_days: 550
     - job: categories
       alias: categories
       allow_empty: false

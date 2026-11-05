@@ -14,7 +14,6 @@ job:
     number_of_workers: 2
   processing:
     type: lookback        # lookback | backfill; applies to every source's dates
-    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
   sources:
     - contract: marketing_spend_raw
       alias: marketing_spend

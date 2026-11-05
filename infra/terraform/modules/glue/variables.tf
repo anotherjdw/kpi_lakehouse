@@ -21,16 +21,22 @@ variable "jobs" {
   }))
 }
 
-variable "scheduled_triggers" {
-  description = "Jobs started on a schedule: job name to an AWS cron expression, e.g. cron(0 6 * * ? *)."
-  type        = map(string)
-  default     = {}
+variable "workflows" {
+  description = "Glue workflows keyed by name: the AWS cron expression that starts a run, e.g. cron(0 6 * * ? *), and the jobs with no upstream job that the run starts."
+  type = map(object({
+    schedule = string
+    jobs     = list(string)
+  }))
+  default = {}
 }
 
 variable "conditional_triggers" {
-  description = "Jobs started when another job's run succeeds: job name to the name of the job it runs after."
-  type        = map(string)
-  default     = {}
+  description = "Jobs started inside a workflow run: job name to its workflow and the jobs it reads from, all of which must succeed in that run first."
+  type = map(object({
+    workflow = string
+    upstream = list(string)
+  }))
+  default = {}
 }
 
 variable "role_arn" {

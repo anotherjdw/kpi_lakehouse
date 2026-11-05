@@ -8,10 +8,9 @@ job:
   description: Dimension table providing additional anonymized data relating to current and former customers.
   glue:
     worker_type: G.1X
-    number_of_workers: 2
+    number_of_workers: 5
   processing:
     type: lookback        # lookback | backfill; applies to every source's dates
-    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
   sources:
     - job: customers
       # job: <job name>   # instead of contract, to read another job's output; create that job first

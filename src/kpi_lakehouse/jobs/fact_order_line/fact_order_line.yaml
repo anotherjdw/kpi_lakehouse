@@ -8,10 +8,9 @@ job:
   description: Fact table providing summary of key information about items ordered by the customer.
   glue:
     worker_type: G.1X
-    number_of_workers: 2
+    number_of_workers: 5
   processing:
     type: lookback        # lookback | backfill; applies to every source's dates
-    # schedule: cron(0 6 * * ? *)   # optional; AWS cron, UTC; only for a job with no upstream job
   sources:
     - job: orders
       alias: orders
@@ -28,11 +27,11 @@ job:
     - job: dim_customer
       alias: dim_customer
       allow_empty: false
-      lookback_days: 1095 # full history
+      lookback_days: 550 # full history
     - job: dim_product
       alias: dim_product
       allow_empty: false
-      lookback_days: 1095 # full history
+      lookback_days: 550 # full history
     - job: sessions
       alias: sessions
       allow_empty: false

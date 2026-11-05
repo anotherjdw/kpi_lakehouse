@@ -426,7 +426,7 @@ module "glue" {
     }
     customers = {
       glue = {
-        number_of_workers = 2
+        number_of_workers = 10
         worker_type       = "G.1X"
       }
       arguments = {
@@ -439,7 +439,7 @@ module "glue" {
     }
     dim_customer = {
       glue = {
-        number_of_workers = 2
+        number_of_workers = 5
         worker_type       = "G.1X"
       }
       arguments = {
@@ -463,7 +463,7 @@ module "glue" {
     }
     dim_product = {
       glue = {
-        number_of_workers = 2
+        number_of_workers = 5
         worker_type       = "G.1X"
       }
       arguments = {
@@ -472,19 +472,19 @@ module "glue" {
         OUTPUT_TABLE           = "${module.catalog.table_names["processed/dim_product"]}"
         PROCESSING_TYPE        = "lookback"
         PRODUCTS_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/products/"
-        PRODUCTS_LOOKBACK_DAYS = "1095"
+        PRODUCTS_LOOKBACK_DAYS = "550"
       }
     }
     fact_order_line = {
       glue = {
-        number_of_workers = 2
+        number_of_workers = 5
         worker_type       = "G.1X"
       }
       arguments = {
         DIM_CUSTOMER_INPUT_PATH    = "s3://${module.s3.bucket_names["processed"]}/dim_customer/"
-        DIM_CUSTOMER_LOOKBACK_DAYS = "1095"
+        DIM_CUSTOMER_LOOKBACK_DAYS = "550"
         DIM_PRODUCT_INPUT_PATH     = "s3://${module.s3.bucket_names["processed"]}/dim_product/"
-        DIM_PRODUCT_LOOKBACK_DAYS  = "1095"
+        DIM_PRODUCT_LOOKBACK_DAYS  = "550"
         ORDERS_INPUT_PATH          = "s3://${module.s3.bucket_names["preprocessed"]}/orders/"
         ORDERS_LOOKBACK_DAYS       = "45"
         ORDER_ITEMS_INPUT_PATH     = "s3://${module.s3.bucket_names["preprocessed"]}/order_items/"
@@ -673,16 +673,26 @@ module "glue" {
     }
   }
 
-  scheduled_triggers = {}
+  workflows = {
+    daily = {
+      schedule = "cron(0 6 * * ? *)"
+      jobs     = ["categories", "customers", "fx_rates", "products", "session_events"]
+    }
+  }
 
   conditional_triggers = {
-    dim_customer    = "customers"
-    kpi_daily_sales = "fact_order_line"
-    marketing_spend = "fx_rates"
-    order_items     = "orders"
-    orders          = "fx_rates"
-    returns         = "order_items"
-    sessions        = "session_events"
+    dim_customer            = { workflow = "daily", upstream = ["customers"] }
+    dim_product             = { workflow = "daily", upstream = ["categories", "products"] }
+    fact_order_line         = { workflow = "daily", upstream = ["dim_customer", "dim_product", "order_items", "orders", "returns", "sessions"] }
+    fact_session            = { workflow = "daily", upstream = ["dim_customer", "sessions"] }
+    kpi_channel_performance = { workflow = "daily", upstream = ["fact_order_line", "fact_session", "marketing_spend"] }
+    kpi_daily_sales         = { workflow = "daily", upstream = ["fact_order_line"] }
+    kpi_return_rate         = { workflow = "daily", upstream = ["dim_product", "fact_order_line"] }
+    marketing_spend         = { workflow = "daily", upstream = ["fx_rates"] }
+    order_items             = { workflow = "daily", upstream = ["orders"] }
+    orders                  = { workflow = "daily", upstream = ["fx_rates"] }
+    returns                 = { workflow = "daily", upstream = ["order_items"] }
+    sessions                = { workflow = "daily", upstream = ["session_events"] }
   }
   # <<< AMEND:JOBS
   # END ETL jobs and triggers
