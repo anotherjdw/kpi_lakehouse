@@ -519,12 +519,13 @@ module "glue" {
         worker_type       = "G.1X"
       }
       arguments = {
-        DATES_INPUT_PATH       = "s3://${module.s3.bucket_names["raw"]}/dates/"
-        FX_RATES_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/fx_rates/"
-        FX_RATES_LOOKBACK_DAYS = "14"
-        OUTPUT_PATH            = "s3://${module.s3.bucket_names["preprocessed"]}/fx_rates/"
-        OUTPUT_TABLE           = "${module.catalog.table_names["preprocessed/fx_rates"]}"
-        PROCESSING_TYPE        = "lookback"
+        DATES_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/dates/"
+        FX_RATES_END_DATE   = "2026-11-05"
+        FX_RATES_INPUT_PATH = "s3://${module.s3.bucket_names["raw"]}/fx_rates/"
+        FX_RATES_START_DATE = "2026-06-01"
+        OUTPUT_PATH         = "s3://${module.s3.bucket_names["preprocessed"]}/fx_rates/"
+        OUTPUT_TABLE        = "${module.catalog.table_names["preprocessed/fx_rates"]}"
+        PROCESSING_TYPE     = "backfill"
       }
     }
     kpi_channel_performance = {
