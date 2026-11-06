@@ -75,7 +75,7 @@ def test_run_end_to_end(
 ) -> None:
     """run() writes exactly the job's reviewed output rows and registers them in the table."""
     assert inputs.INPUTS_FILLED, inputs_message("fx_rates")
-    assert expected.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
+    assert expected.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
     dates = processing_dates(SOURCES)
     output_path = str(test_dir / "output")
     argv = [
@@ -96,7 +96,7 @@ def test_run_end_to_end(
     monkeypatch.setattr(sys, "argv", argv)
     job.run()
     df_actual = spark.read.parquet(output_path)
-    df_expected = rows_to_df(spark, expected.COALESCE_RATE_DATE_ROWS, OUTPUT_SCHEMA)
+    df_expected = rows_to_df(spark, expected.FILTER_UNUSED_DATES_ROWS, OUTPUT_SCHEMA)
     columns = df_expected.columns
     assert column_types(df_actual.schema) == column_types(df_expected.schema)
     actual = df_actual.select(columns).collect()
@@ -105,7 +105,7 @@ def test_run_end_to_end(
     # The run registered one partition per date it wrote, so the table, which Athena reads,
     # holds the same rows as the files.
     partition_key = "rate_date"
-    output_dates = fixture_dates(expected.COALESCE_RATE_DATE_ROWS, partition_key)
+    output_dates = fixture_dates(expected.FILTER_UNUSED_DATES_ROWS, partition_key)
     partitions = [f"{partition_key}={day}" for day in output_dates]
     assert registered_partitions(spark, output_table) == partitions
     df_table = spark.table(output_table)

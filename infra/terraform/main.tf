@@ -521,7 +521,7 @@ module "glue" {
       arguments = {
         DATES_INPUT_PATH       = "s3://${module.s3.bucket_names["raw"]}/dates/"
         FX_RATES_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/fx_rates/"
-        FX_RATES_LOOKBACK_DAYS = "7"
+        FX_RATES_LOOKBACK_DAYS = "14"
         OUTPUT_PATH            = "s3://${module.s3.bucket_names["preprocessed"]}/fx_rates/"
         OUTPUT_TABLE           = "${module.catalog.table_names["preprocessed/fx_rates"]}"
         PROCESSING_TYPE        = "lookback"

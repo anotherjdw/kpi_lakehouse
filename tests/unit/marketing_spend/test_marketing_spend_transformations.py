@@ -75,7 +75,7 @@ KEEP_LATEST_RESTATEMENT_SCHEMA = StructType(
 def test_join_fx_rates(spark: SparkSession) -> None:
     """join_fx_rates returns exactly its reviewed expected rows."""
     assert inputs.INPUTS_FILLED, inputs_message("marketing_spend")
-    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
+    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
     assert expected.JOIN_FX_RATES_REVIEWED, review_message("marketing_spend", "JOIN_FX_RATES")
     df_actual = job.join_fx_rates(
         rows_to_df(spark, inputs.FX_RATES_ROWS, schema_definitions.fx_rates_schema),
@@ -96,7 +96,7 @@ def test_join_fx_rates(spark: SparkSession) -> None:
 def test_keep_latest_restatement(spark: SparkSession) -> None:
     """keep_latest_restatement returns exactly its reviewed expected rows."""
     assert inputs.INPUTS_FILLED, inputs_message("marketing_spend")
-    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
+    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
     assert expected.KEEP_LATEST_RESTATEMENT_REVIEWED, review_message(
         "marketing_spend",
         "KEEP_LATEST_RESTATEMENT",
@@ -119,7 +119,7 @@ def test_keep_latest_restatement(spark: SparkSession) -> None:
 def test_convert_spend_amount_to_euros(spark: SparkSession) -> None:
     """convert_spend_amount_to_euros returns exactly its reviewed expected rows."""
     assert inputs.INPUTS_FILLED, inputs_message("marketing_spend")
-    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
+    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
     assert expected.CONVERT_SPEND_AMOUNT_TO_EUROS_REVIEWED, review_message(
         "marketing_spend",
         "CONVERT_SPEND_AMOUNT_TO_EUROS",

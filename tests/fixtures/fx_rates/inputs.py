@@ -56,6 +56,9 @@ FX_RATES_ROWS = [
 # Thursday 15 to Sunday 18 October 2026: the weekend has no rates to join, so
 # fill_weekends_and_holidays must carry Friday's rates forward.
 DATES_ROWS = [
+    # Wednesday 14 October 2026, before the first published rate: no rate to carry forward, so
+    # CHF, CZK and PLN have a null rate, which filter_unused_dates must drop; EUR keeps 1.0.
+    Row(date=date(2026, 10, 14)),
     Row(date=date(2026, 10, 15)),
     Row(date=date(2026, 10, 16)),
     Row(date=date(2026, 10, 17)),

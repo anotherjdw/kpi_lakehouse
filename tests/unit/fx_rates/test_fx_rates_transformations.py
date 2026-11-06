@@ -49,6 +49,15 @@ FILL_WEEKENDS_AND_HOLIDAYS_SCHEMA = StructType(
     ]
 )
 
+COALESCE_RATE_DATE_SCHEMA = StructType(
+    [
+        StructField("rate_date", DateType(), nullable=True),
+        StructField("base_currency", StringType(), nullable=True),
+        StructField("quote_currency", StringType(), nullable=True),
+        StructField("rate", DecimalType(18, 8), nullable=True),
+    ]
+)
+
 
 def test_join_fx_rates_to_date(spark: SparkSession) -> None:
     """join_fx_rates_to_date returns exactly its reviewed expected rows."""
@@ -109,6 +118,28 @@ def test_coalesce_rate_date(spark: SparkSession) -> None:
     df_expected = rows_to_df(
         spark,
         expected.COALESCE_RATE_DATE_ROWS,
+        COALESCE_RATE_DATE_SCHEMA,
+    )
+    columns = df_expected.columns
+    assert column_types(df_actual.schema) == column_types(df_expected.schema)
+    actual = df_actual.select(columns).collect()
+    expected_rows = df_expected.collect()
+    assert sorted(actual, key=row_key) == sorted(expected_rows, key=row_key)
+
+
+def test_filter_unused_dates(spark: SparkSession) -> None:
+    """filter_unused_dates returns exactly its reviewed expected rows."""
+    assert inputs.INPUTS_FILLED, inputs_message("fx_rates")
+    assert expected.FILTER_UNUSED_DATES_REVIEWED, review_message(
+        "fx_rates",
+        "FILTER_UNUSED_DATES",
+    )
+    df_actual = job.filter_unused_dates(
+        rows_to_df(spark, expected.COALESCE_RATE_DATE_ROWS, COALESCE_RATE_DATE_SCHEMA),
+    )
+    df_expected = rows_to_df(
+        spark,
+        expected.FILTER_UNUSED_DATES_ROWS,
         schema_definitions.fx_rates_schema,
     )
     columns = df_expected.columns

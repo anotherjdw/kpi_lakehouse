@@ -122,7 +122,7 @@ def create_pyspark_dataframe(
     Raises:
         ValueError: If a value in `date_ranges` is not a YYYY-MM-DD string.
     """
-    reader = spark.read.format(file_format).option("multiLine", "true")
+    reader = spark.read.format(file_format).option("multiLine", "false")
     if schema is not None:
         reader = reader.schema(schema)
 

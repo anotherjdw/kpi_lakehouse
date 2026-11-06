@@ -115,6 +115,32 @@ def coalesce_rate_date(fill_weekends_and_holidays_result: DataFrame) -> DataFram
     ).drop("date")
 
 
+def filter_unused_dates(coalesce_rate_date_result: DataFrame) -> DataFrame:
+    """Filter dates with no non-EUR quote currencies having rates, then remove null rates.
+
+    Args:
+        coalesce_rate_date_result: DataFrame with rate_date, base_currency,
+            quote_currency, and rate columns representing currency exchange rates.
+
+    Returns:
+        DataFrame containing only rows from dates where at least one non-EUR
+        quote_currency has a non-null rate, and where the rate itself is not null.
+    """
+    non_eur_dates = (
+        coalesce_rate_date_result.filter(
+            (F.col("quote_currency") != "EUR") & F.col("rate").isNotNull()
+        )
+        .select("rate_date")
+        .distinct()
+    )
+    result = (
+        coalesce_rate_date_result.join(non_eur_dates, on="rate_date", how="inner")
+        .filter(F.col("rate").isNotNull())
+        .select("rate_date", "base_currency", "quote_currency", "rate")
+    )
+    return result
+
+
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse this job's Glue arguments, ignoring the ones Glue adds itself."""
     parser = argparse.ArgumentParser(allow_abbrev=False)
@@ -172,7 +198,8 @@ def transform(fx_rates: DataFrame, dates: DataFrame) -> DataFrame:
     join_fx_rates_to_date_result = join_fx_rates_to_date(fx_rates, dates)
     fill_weekends_and_holidays_result = fill_weekends_and_holidays(join_fx_rates_to_date_result)
     coalesce_rate_date_result = coalesce_rate_date(fill_weekends_and_holidays_result)
-    return coalesce_rate_date_result
+    filter_unused_dates_result = filter_unused_dates(coalesce_rate_date_result)
+    return filter_unused_dates_result
 
 
 def write(output: DataFrame, output_file_path: str, output_table: str) -> None:

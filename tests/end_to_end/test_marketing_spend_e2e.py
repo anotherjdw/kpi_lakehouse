@@ -75,7 +75,7 @@ def test_run_end_to_end(
 ) -> None:
     """run() writes exactly the job's reviewed output rows and registers them in the table."""
     assert inputs.INPUTS_FILLED, inputs_message("marketing_spend")
-    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
+    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
     assert expected.CONVERT_SPEND_AMOUNT_TO_EUROS_REVIEWED, review_message(
         "marketing_spend",
         "CONVERT_SPEND_AMOUNT_TO_EUROS",

@@ -17,7 +17,7 @@ job:
       alias: fx_rates
       allow_empty: false  # true lets this source read no rows without failing the run
       # The dates this source reads, if it is partitioned by date; an unpartitioned source sets none.
-      lookback_days: 7    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      lookback_days: 14    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
       # start_date: 2026-01-01   # YYYY-MM-DD; set both dates when type is backfill, neither for lookback
       # end_date: 2026-01-01     # backfill processes every day from start_date to end_date
     - contract: dates
@@ -63,3 +63,9 @@ job:
       output:
         grain_change: false
         removes_columns: [date]
+    - name: filter unused dates
+      description: filter out every date on which no quote_currency other than EUR has a rate value. Then filter out any remaining row whose rate is null.
+      inputs: [coalesce rate date]
+      depends_on: [coalesce rate date]
+      output:
+        grain_change: false

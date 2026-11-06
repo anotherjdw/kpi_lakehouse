@@ -94,7 +94,7 @@ JOIN_FX_RATES_SCHEMA = StructType(
 def test_create_order_date(spark: SparkSession) -> None:
     """create_order_date returns exactly its reviewed expected rows."""
     assert inputs.INPUTS_FILLED, inputs_message("orders")
-    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
+    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
     assert expected.CREATE_ORDER_DATE_REVIEWED, review_message("orders", "CREATE_ORDER_DATE")
     df_actual = job.create_order_date(
         rows_to_df(spark, inputs.ORDERS_ROWS, schema_definitions.orders_raw_schema),
@@ -110,7 +110,7 @@ def test_create_order_date(spark: SparkSession) -> None:
 def test_keep_latest_status(spark: SparkSession) -> None:
     """keep_latest_status returns exactly its reviewed expected rows."""
     assert inputs.INPUTS_FILLED, inputs_message("orders")
-    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
+    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
     assert expected.KEEP_LATEST_STATUS_REVIEWED, review_message("orders", "KEEP_LATEST_STATUS")
     df_actual = job.keep_latest_status(
         rows_to_df(spark, expected.CREATE_ORDER_DATE_ROWS, CREATE_ORDER_DATE_SCHEMA),
@@ -126,7 +126,7 @@ def test_keep_latest_status(spark: SparkSession) -> None:
 def test_join_fx_rates(spark: SparkSession) -> None:
     """join_fx_rates returns exactly its reviewed expected rows."""
     assert inputs.INPUTS_FILLED, inputs_message("orders")
-    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
+    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
     assert expected.JOIN_FX_RATES_REVIEWED, review_message("orders", "JOIN_FX_RATES")
     df_actual = job.join_fx_rates(
         rows_to_df(spark, inputs.FX_RATES_ROWS, schema_definitions.fx_rates_schema),
@@ -143,7 +143,7 @@ def test_join_fx_rates(spark: SparkSession) -> None:
 def test_convert_shipping_fee(spark: SparkSession) -> None:
     """convert_shipping_fee returns exactly its reviewed expected rows."""
     assert inputs.INPUTS_FILLED, inputs_message("orders")
-    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
+    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
     assert expected.CONVERT_SHIPPING_FEE_REVIEWED, review_message("orders", "CONVERT_SHIPPING_FEE")
     df_actual = job.convert_shipping_fee(
         rows_to_df(spark, expected.JOIN_FX_RATES_ROWS, JOIN_FX_RATES_SCHEMA),
