@@ -100,10 +100,10 @@ def test_read_no_data_raises(spark: SparkSession, test_dir: Path) -> None:
 def test_transform(spark: SparkSession, test_dir: Path) -> None:
     """transform() over the sources read returns the job's reviewed output rows."""
     assert inputs.INPUTS_FILLED, inputs_message("fx_rates")
-    assert expected.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
+    assert expected.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
     args = job.parse_arguments(write_sources(spark, SOURCES, test_dir))
     df_actual = job.transform(**job.read(args, processing_dates(SOURCES)))
-    df_expected = rows_to_df(spark, expected.FILTER_UNUSED_DATES_ROWS, OUTPUT_SCHEMA)
+    df_expected = rows_to_df(spark, expected.COALESCE_RATE_DATE_ROWS, OUTPUT_SCHEMA)
     columns = df_expected.columns
     assert column_types(df_actual.schema) == column_types(df_expected.schema)
     actual = df_actual.select(columns).collect()
@@ -114,18 +114,18 @@ def test_transform(spark: SparkSession, test_dir: Path) -> None:
 def test_write(spark: SparkSession, test_dir: Path, output_table: str) -> None:
     """write() stores the reviewed output rows as parquet and registers them in the table."""
     assert inputs.INPUTS_FILLED, inputs_message("fx_rates")
-    assert expected.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
-    output = rows_to_df(spark, expected.FILTER_UNUSED_DATES_ROWS, OUTPUT_SCHEMA)
+    assert expected.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
+    output = rows_to_df(spark, expected.COALESCE_RATE_DATE_ROWS, OUTPUT_SCHEMA)
     job.write(output, str(test_dir), output_table)
     result = spark.read.parquet(str(test_dir))
     assert column_types(result.schema) == column_types(OUTPUT_SCHEMA)
-    assert result.count() == len(expected.FILTER_UNUSED_DATES_ROWS)
+    assert result.count() == len(expected.COALESCE_RATE_DATE_ROWS)
     for column in NOT_NULL_COLUMNS:
         assert result.filter(result[column].isNull()).isEmpty(), column
     # One folder per partition value.
     partition_key = "rate_date"
     folders = sorted(path.name for path in test_dir.iterdir() if path.is_dir())
-    dates = fixture_dates(expected.FILTER_UNUSED_DATES_ROWS, partition_key)
+    dates = fixture_dates(expected.COALESCE_RATE_DATE_ROWS, partition_key)
     assert folders == [f"{partition_key}={day}" for day in dates]
     # The table, which Athena reads, lists one partition per folder and holds every row.
     assert registered_partitions(spark, output_table) == folders

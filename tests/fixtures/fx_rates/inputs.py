@@ -63,4 +63,5 @@ DATES_ROWS = [
     Row(date=date(2026, 10, 16)),
     Row(date=date(2026, 10, 17)),
     Row(date=date(2026, 10, 18)),
+    Row(date=date(2026, 10, 19)),
 ]

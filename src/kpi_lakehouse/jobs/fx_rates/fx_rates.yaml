@@ -56,16 +56,21 @@ job:
       depends_on: [join fx rates to date]
       output:
         grain_change: false
+    - name: filter unused dates
+      description: >-
+        Take the latest rate_date. Filled rows have a null rate_date, so this is the last
+        date with a published rate. The cutoff is the first Monday-to-Friday date after it.
+        Filter out every row whose date is on or after the cutoff. Then filter out every date
+        on which no quote_currency other than EUR has a rate value. Then filter out any
+        remaining row whose rate is null.
+      inputs: [ fill weekends and holidays ]
+      depends_on: [ fill weekends and holidays ]
+      output:
+        grain_change: false
     - name: coalesce rate_date
       description: coalesce rate_date and date columns, in that order and assign to rate_date. Drop date column
-      inputs: [fill weekends and holidays]
-      depends_on: [fill weekends and holidays]
+      inputs: [ filter unused dates ]
+      depends_on: [ filter unused dates ]
       output:
         grain_change: false
         removes_columns: [date]
-    - name: filter unused dates
-      description: filter out every date on which no quote_currency other than EUR has a rate value. Then filter out any remaining row whose rate is null.
-      inputs: [coalesce rate date]
-      depends_on: [coalesce rate date]
-      output:
-        grain_change: false

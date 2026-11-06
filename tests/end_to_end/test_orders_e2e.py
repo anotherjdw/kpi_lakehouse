@@ -75,7 +75,7 @@ def test_run_end_to_end(
 ) -> None:
     """run() writes exactly the job's reviewed output rows and registers them in the table."""
     assert inputs.INPUTS_FILLED, inputs_message("orders")
-    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
+    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
     assert expected.CONVERT_SHIPPING_FEE_REVIEWED, review_message("orders", "CONVERT_SHIPPING_FEE")
     dates = processing_dates(SOURCES)
     output_path = str(test_dir / "output")

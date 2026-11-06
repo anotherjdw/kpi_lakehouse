@@ -13,8 +13,8 @@ from hashlib import md5, sha256
 
 from pyspark.sql import Row
 
-from tests.fixtures.fx_rates.expected import FILTER_UNUSED_DATES_REVIEWED
-from tests.fixtures.fx_rates.expected import FILTER_UNUSED_DATES_ROWS as FX_RATES_ROWS
+from tests.fixtures.fx_rates.expected import COALESCE_RATE_DATE_REVIEWED
+from tests.fixtures.fx_rates.expected import COALESCE_RATE_DATE_ROWS as FX_RATES_ROWS
 
 INPUTS_FILLED = True
 

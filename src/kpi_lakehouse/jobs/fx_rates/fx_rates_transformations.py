@@ -6,6 +6,7 @@ transformation whose body `generate codegen` writes.
 """
 
 import argparse
+from datetime import timedelta
 
 from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
@@ -99,46 +100,55 @@ def fill_weekends_and_holidays(join_fx_rates_to_date_result: DataFrame) -> DataF
     return result
 
 
-def coalesce_rate_date(fill_weekends_and_holidays_result: DataFrame) -> DataFrame:
+def filter_unused_dates(fill_weekends_and_holidays_result: DataFrame) -> DataFrame:
+    """Filter rows based on date cutoff and rate availability.
+
+    Computes the latest non-null rate_date, derives a cutoff as the next
+    Monday-to-Friday date after it, removes rows on or after that cutoff,
+    removes dates where no quote_currency other than EUR has a non-null rate,
+    and finally removes any remaining rows with a null rate.
+
+    Args:
+        fill_weekends_and_holidays_result: DataFrame with columns rate_date,
+            base_currency, quote_currency, rate, and date.
+
+    Returns:
+        DataFrame with the same schema, filtered to only include rows before
+        the cutoff date, on dates that have at least one non-EUR quote_currency
+        with a non-null rate, and where rate itself is not null.
+    """
+    max_rate_date = fill_weekends_and_holidays_result.agg(
+        F.max("rate_date").alias("max_rate_date")
+    ).collect()[0]["max_rate_date"]
+    candidate = max_rate_date + timedelta(days=1)
+    while candidate.weekday() >= 5:
+        candidate = candidate + timedelta(days=1)
+    cutoff_date = candidate
+    df = fill_weekends_and_holidays_result.filter(F.col("date") < F.lit(cutoff_date))
+    valid_dates = (
+        df.filter((F.col("quote_currency") != "EUR") & F.col("rate").isNotNull())
+        .select("date")
+        .distinct()
+    )
+    df = df.join(valid_dates, on="date", how="inner")
+    df = df.filter(F.col("rate").isNotNull())
+    return df.select("rate_date", "base_currency", "quote_currency", "rate", "date")
+
+
+def coalesce_rate_date(filter_unused_dates_result: DataFrame) -> DataFrame:
     """Coalesce rate_date and date columns into rate_date, dropping the date column.
 
     Args:
-        fill_weekends_and_holidays_result: DataFrame containing rate_date, base_currency,
+        filter_unused_dates_result: DataFrame containing rate_date, base_currency,
             quote_currency, rate, and date columns.
 
     Returns:
         DataFrame with rate_date coalesced from rate_date and date columns, with the
         date column dropped.
     """
-    return fill_weekends_and_holidays_result.withColumn(
+    return filter_unused_dates_result.withColumn(
         "rate_date", F.coalesce(F.col("rate_date"), F.col("date"))
     ).drop("date")
-
-
-def filter_unused_dates(coalesce_rate_date_result: DataFrame) -> DataFrame:
-    """Filter dates with no non-EUR quote currencies having rates, then remove null rates.
-
-    Args:
-        coalesce_rate_date_result: DataFrame with rate_date, base_currency,
-            quote_currency, and rate columns representing currency exchange rates.
-
-    Returns:
-        DataFrame containing only rows from dates where at least one non-EUR
-        quote_currency has a non-null rate, and where the rate itself is not null.
-    """
-    non_eur_dates = (
-        coalesce_rate_date_result.filter(
-            (F.col("quote_currency") != "EUR") & F.col("rate").isNotNull()
-        )
-        .select("rate_date")
-        .distinct()
-    )
-    result = (
-        coalesce_rate_date_result.join(non_eur_dates, on="rate_date", how="inner")
-        .filter(F.col("rate").isNotNull())
-        .select("rate_date", "base_currency", "quote_currency", "rate")
-    )
-    return result
 
 
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
@@ -197,9 +207,9 @@ def transform(fx_rates: DataFrame, dates: DataFrame) -> DataFrame:
     """Run the transformations in dependency order and return the job's output."""
     join_fx_rates_to_date_result = join_fx_rates_to_date(fx_rates, dates)
     fill_weekends_and_holidays_result = fill_weekends_and_holidays(join_fx_rates_to_date_result)
-    coalesce_rate_date_result = coalesce_rate_date(fill_weekends_and_holidays_result)
-    filter_unused_dates_result = filter_unused_dates(coalesce_rate_date_result)
-    return filter_unused_dates_result
+    filter_unused_dates_result = filter_unused_dates(fill_weekends_and_holidays_result)
+    coalesce_rate_date_result = coalesce_rate_date(filter_unused_dates_result)
+    return coalesce_rate_date_result
 
 
 def write(output: DataFrame, output_file_path: str, output_table: str) -> None:

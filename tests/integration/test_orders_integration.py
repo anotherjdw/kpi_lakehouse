@@ -87,7 +87,7 @@ def output_table(spark: SparkSession, test_database: str, test_dir: Path) -> Ite
 def test_read(spark: SparkSession, test_dir: Path) -> None:
     """read() loads every input row of every source, in its contract's column types."""
     assert inputs.INPUTS_FILLED, inputs_message("orders")
-    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
+    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
     args = job.parse_arguments(write_sources(spark, SOURCES, test_dir))
     sources = job.read(args, processing_dates(SOURCES))
     assert set(sources) == set(SOURCES)
@@ -99,7 +99,7 @@ def test_read(spark: SparkSession, test_dir: Path) -> None:
 def test_read_no_data_raises(spark: SparkSession, test_dir: Path) -> None:
     """read() fails for dates with no input rows, since a source may not be empty."""
     assert inputs.INPUTS_FILLED, inputs_message("orders")
-    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
+    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
     args = job.parse_arguments(write_sources(spark, SOURCES, test_dir))
     # Each partitioned source reads the day before its first input row.
     days_before = {
@@ -113,7 +113,7 @@ def test_read_no_data_raises(spark: SparkSession, test_dir: Path) -> None:
 def test_transform(spark: SparkSession, test_dir: Path) -> None:
     """transform() over the sources read returns the job's reviewed output rows."""
     assert inputs.INPUTS_FILLED, inputs_message("orders")
-    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
+    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
     assert expected.CONVERT_SHIPPING_FEE_REVIEWED, review_message("orders", "CONVERT_SHIPPING_FEE")
     args = job.parse_arguments(write_sources(spark, SOURCES, test_dir))
     df_actual = job.transform(**job.read(args, processing_dates(SOURCES)))
@@ -128,7 +128,7 @@ def test_transform(spark: SparkSession, test_dir: Path) -> None:
 def test_write(spark: SparkSession, test_dir: Path, output_table: str) -> None:
     """write() stores the reviewed output rows as parquet and registers them in the table."""
     assert inputs.INPUTS_FILLED, inputs_message("orders")
-    assert inputs.FILTER_UNUSED_DATES_REVIEWED, review_message("fx_rates", "FILTER_UNUSED_DATES")
+    assert inputs.COALESCE_RATE_DATE_REVIEWED, review_message("fx_rates", "COALESCE_RATE_DATE")
     assert expected.CONVERT_SHIPPING_FEE_REVIEWED, review_message("orders", "CONVERT_SHIPPING_FEE")
     output = rows_to_df(spark, expected.CONVERT_SHIPPING_FEE_ROWS, OUTPUT_SCHEMA)
     job.write(output, str(test_dir), output_table)
