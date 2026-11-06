@@ -23,7 +23,7 @@ job:
     - job: fx_rates
       alias: fx_rates
       allow_empty: false
-      lookback_days: 14
+      lookback_days: 60
   sink:
     contract: orders   # the output contract: contracts/orders_data_contract.yaml
     write_mode: overwrite     # the only mode: replaces the partitions present in the output
