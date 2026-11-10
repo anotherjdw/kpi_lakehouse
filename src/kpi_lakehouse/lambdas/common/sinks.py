@@ -61,7 +61,7 @@ class RawWriter:
                 folder, name = f"{dataset}/{key}={value}", f"part-{tag}"
             else:
                 folder, name = dataset, dataset
-            body = (json_lines(contract, [{k: v for k, v in r.items() if k != key} for r in rows]),)
+            body = json_lines(contract, [{k: v for k, v in r.items() if k != key} for r in rows])
             self.store.put(f"{folder}/{name}.json", body)
             written += len(rows)
         self.buffer.clear()
