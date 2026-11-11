@@ -102,6 +102,14 @@ data "aws_iam_policy_document" "glue_alerts" {
     actions   = ["sns:Publish"]
     resources = [var.alert_topic_arn]
   }
+
+  # A job reads its own run's state and timeout, to report a stop or a timeout itself.
+  statement {
+    sid       = "OwnJobRunRead"
+    effect    = "Allow"
+    actions   = ["glue:GetJobRun"]
+    resources = ["arn:aws:glue:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:job/${var.name_prefix}-*"]
+  }
 }
 
 resource "aws_iam_role_policy" "glue_alerts" {
