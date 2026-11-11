@@ -32,3 +32,26 @@ variable "missed_success_alarms" {
   }))
   default = {}
 }
+
+variable "bucket_names" {
+  description = "Bucket names keyed by layer (module.s3.bucket_names), for the sources' missed-landing alarms."
+  type        = map(string)
+  default     = {}
+}
+
+variable "ingestion_alarms" {
+  description = "Ingestion Lambda functions the team owns, keyed by function name: a failure alarm, and a missed-success alarm after this many whole hours without a SUCCEEDED run record."
+  type = map(object({
+    missed_success_hours = number
+  }))
+  default = {}
+}
+
+variable "landing_alarms" {
+  description = "Sources with a missed-landing alarm, keyed by dataset: the layer whose bucket holds the source's folder, and the whole hours without a new file there before it fires."
+  type = map(object({
+    layer                = string
+    missed_landing_hours = number
+  }))
+  default = {}
+}
