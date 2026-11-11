@@ -712,18 +712,18 @@ module "alerting" {
 
   # 2 hours while K2 is tested, then the 26 a daily job needs.
   missed_success_alarms = {
-    kpi_daily_sales = { missed_success_hours = 2 }
+    kpi_daily_sales = { missed_success_hours = 26 }
   }
 
   # Ingestion (A5a and A5b): 2 hours while K3 is tested, then 26 for a daily extract and
   # for sources that land once a day.
   bucket_names = module.s3.bucket_names
   ingestion_alarms = {
-    "shop-sim-extract" = { missed_success_hours = 2 }
+    "shop-sim-extract" = { missed_success_hours = 26 }
   }
   landing_alarms = {
-    session_events  = { layer = "raw", missed_landing_hours = 2 }
-    marketing_spend = { layer = "raw", missed_landing_hours = 2 }
+    session_events  = { layer = "raw", missed_landing_hours = 26 }
+    marketing_spend = { layer = "raw", missed_landing_hours = 26 }
   }
 }
 # --------------------------------------------------------------------------------------
