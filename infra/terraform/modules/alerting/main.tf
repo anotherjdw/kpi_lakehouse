@@ -13,6 +13,9 @@ locals {
   # Where Glue's continuous logging writes the driver's stdout, run records included: one
   # log group shared by every Glue job in the account, one stream per run.
   glue_output_log_group = "/aws-glue/jobs/output"
+
+  # The buckets of the layers that hold a source with a missed-landing alarm.
+  landing_buckets = toset([for source in values(var.landing_alarms) : var.bucket_names[source.layer]])
 }
 
 data "aws_region" "current" {}
@@ -159,6 +162,196 @@ resource "aws_cloudwatch_metric_alarm" "missed_success" {
   period              = 3600
   evaluation_periods  = each.value.missed_success_hours
   datapoints_to_alarm = each.value.missed_success_hours
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = local.common_tags
+}
+
+# ---------------------------------------------------------------------------------------
+# Ingestion the team owns (A5a), one set per function in var.ingestion_alarms. The function
+# runs in a VPC with no route to SNS, so it can't publish; its log group can be read instead.
+# ---------------------------------------------------------------------------------------
+
+# A failure is a FAILED run record, Lambda's own line for a run cut off at its timeout
+# (which prints no record), or Lambda's [ERROR] line for any unhandled error, including one
+# raised before the handler runs. Any one of them counts.
+resource "aws_cloudwatch_log_metric_filter" "ingestion_failures" {
+  for_each = var.ingestion_alarms
+
+  name           = "${var.name_prefix}-${each.key}-failures"
+  log_group_name = "/aws/lambda/${each.key}"
+  pattern = trimspace(<<-PATTERN
+    ?"Task timed out" ?"[ERROR]" ?"\"status\": \"FAILED\""
+  PATTERN
+  )
+
+  metric_transformation {
+    name      = "${each.key}-failures"
+    namespace = "${var.data_product}/${var.environment}"
+    value     = "1"
+  }
+}
+
+# Fires within a minute of the first failure. A minute with no failure has no data point,
+# which isn't a failure.
+resource "aws_cloudwatch_metric_alarm" "ingestion_failed" {
+  for_each = var.ingestion_alarms
+
+  alarm_name        = "${var.name_prefix}-${each.key}-failed"
+  alarm_description = "${each.key} failed or timed out: its run record or Lambda's own line is in /aws/lambda/${each.key}."
+
+  namespace           = "${var.data_product}/${var.environment}"
+  metric_name         = aws_cloudwatch_log_metric_filter.ingestion_failures[each.key].metric_transformation[0].name
+  statistic           = "Sum"
+  period              = 60
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = local.common_tags
+}
+
+# As the Glue jobs' missed-success alarms (A2), on the function's own log group.
+resource "aws_cloudwatch_log_metric_filter" "ingestion_succeeded_runs" {
+  for_each = var.ingestion_alarms
+
+  name           = "${var.name_prefix}-${each.key}-succeeded-runs"
+  log_group_name = "/aws/lambda/${each.key}"
+  pattern = trimspace(<<-PATTERN
+    "RUN_RECORD" "\"status\": \"SUCCEEDED\""
+  PATTERN
+  )
+
+  metric_transformation {
+    name      = "${each.key}-succeeded-runs"
+    namespace = "${var.data_product}/${var.environment}"
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "ingestion_missed_success" {
+  for_each = var.ingestion_alarms
+
+  alarm_name        = "${var.name_prefix}-${each.key}-missed-success"
+  alarm_description = "${each.key} has written no SUCCEEDED run record for ${each.value.missed_success_hours} hours."
+
+  namespace           = "${var.data_product}/${var.environment}"
+  metric_name         = aws_cloudwatch_log_metric_filter.ingestion_succeeded_runs[each.key].metric_transformation[0].name
+  statistic           = "Sum"
+  period              = 3600
+  evaluation_periods  = each.value.missed_success_hours
+  datapoints_to_alarm = each.value.missed_success_hours
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = local.common_tags
+}
+
+# ---------------------------------------------------------------------------------------
+# Source data the team doesn't own (A5b), one alarm per source in var.landing_alarms. S3
+# reports every new object to EventBridge, one rule writes those events to a log group,
+# and a filter per source counts the events for keys under its folder.
+# ---------------------------------------------------------------------------------------
+
+# Manages the whole notification configuration of each bucket; none was set before.
+resource "aws_s3_bucket_notification" "landings" {
+  for_each = local.landing_buckets
+
+  bucket      = each.key
+  eventbridge = true
+}
+
+resource "aws_cloudwatch_log_group" "landings" {
+  name              = "/aws/events/${var.name_prefix}-landings"
+  retention_in_days = 14
+  tags              = local.common_tags
+}
+
+# Lets EventBridge write the events to the log group.
+data "aws_iam_policy_document" "landings_log_group" {
+  statement {
+    sid       = "EventBridgeWrite"
+    effect    = "Allow"
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["${aws_cloudwatch_log_group.landings.arn}:*"]
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com", "delivery.logs.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_cloudwatch_log_resource_policy" "landings" {
+  policy_name     = "${var.name_prefix}-landings"
+  policy_document = data.aws_iam_policy_document.landings_log_group.json
+}
+
+resource "aws_cloudwatch_event_rule" "landings" {
+  count = length(local.landing_buckets) > 0 ? 1 : 0
+
+  name        = "${var.name_prefix}-landings"
+  description = "A new object in a ${var.name_prefix} bucket that holds a source with a missed-landing alarm."
+
+  event_pattern = jsonencode({
+    source        = ["aws.s3"]
+    "detail-type" = ["Object Created"]
+    detail = {
+      bucket = { name = sort(local.landing_buckets) }
+    }
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "landings" {
+  count = length(local.landing_buckets) > 0 ? 1 : 0
+
+  rule = aws_cloudwatch_event_rule.landings[0].name
+  arn  = aws_cloudwatch_log_group.landings.arn
+}
+
+# Any new object under the source's folder counts, whatever its partition. The events are
+# pure JSON, so the filter reads the key directly; the slash keeps another dataset whose
+# name starts the same way out.
+resource "aws_cloudwatch_log_metric_filter" "landed_files" {
+  for_each = var.landing_alarms
+
+  name           = "${var.name_prefix}-${each.key}-landed-files"
+  log_group_name = aws_cloudwatch_log_group.landings.name
+  pattern        = "{ $.detail.object.key = \"${each.key}/*\" }"
+
+  metric_transformation {
+    name      = "${each.key}-landed-files"
+    namespace = "${var.data_product}/${var.environment}"
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "missed_landing" {
+  for_each = var.landing_alarms
+
+  alarm_name        = "${var.name_prefix}-${each.key}-missed-landing"
+  alarm_description = "No new file has landed under s3://${var.bucket_names[each.value.layer]}/${each.key}/ for ${each.value.missed_landing_hours} hours."
+
+  namespace           = "${var.data_product}/${var.environment}"
+  metric_name         = aws_cloudwatch_log_metric_filter.landed_files[each.key].metric_transformation[0].name
+  statistic           = "Sum"
+  period              = 3600
+  evaluation_periods  = each.value.missed_landing_hours
+  datapoints_to_alarm = each.value.missed_landing_hours
   threshold           = 1
   comparison_operator = "LessThanThreshold"
   treat_missing_data  = "breaching"

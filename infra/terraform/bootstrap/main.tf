@@ -41,6 +41,13 @@ locals {
   # metric filters read. It is shared by every Glue job in the account.
   glue_output_log_group = "arn:aws:logs:*:${local.account_id}:log-group:/aws-glue/jobs/output"
 
+  # The extract's own log group, created by Lambda, which its alarms' metric filters read.
+  extract_log_group = "arn:aws:logs:*:${local.account_id}:log-group:/aws/lambda/shop-sim-extract"
+
+  # The log group EventBridge writes the raw bucket's new-object events to, for the
+  # missed-landing alarms.
+  landings_log_group = "arn:aws:logs:*:${local.account_id}:log-group:/aws/events/${local.name_prefix}-landings"
+
   # Catalog names hold no hyphens: a layer's database is named after its bucket with
   # "-" turned into "_" (modules/catalog in the main stack).
   catalog_prefix    = replace(local.bucket_prefix, "-", "_")
@@ -182,6 +189,7 @@ data "aws_iam_policy_document" "plan_permissions" {
       "cloudwatch:Describe*",
       "cloudwatch:List*",
       "logs:Describe*",
+      "logs:ListTags*",
     ]
     resources = ["*"]
   }
@@ -248,6 +256,7 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "s3:PutLifecycleConfiguration",
       "s3:PutBucketPolicy",
       "s3:DeleteBucketPolicy",
+      "s3:PutBucketNotification",
       "s3:PutObject",
       "s3:PutObjectTagging",
       "s3:GetObject",
@@ -489,7 +498,47 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "logs:DeleteMetricFilter",
       "logs:DescribeMetricFilters"
     ]
-    resources = [local.glue_output_log_group, "${local.glue_output_log_group}:*"]
+    resources = [
+      local.glue_output_log_group,
+      "${local.glue_output_log_group}:*",
+      local.extract_log_group,
+      "${local.extract_log_group}:*",
+      local.landings_log_group,
+      "${local.landings_log_group}:*",
+    ]
+  }
+
+  # The log group for the raw bucket's new-object events (modules/alerting).
+  statement {
+    sid    = "ManageLandingsLogGroup"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:DeleteLogGroup",
+      "logs:PutRetentionPolicy",
+      "logs:DeleteRetentionPolicy",
+      "logs:TagResource",
+      "logs:UntagResource",
+      "logs:ListTagsForResource",
+      "logs:TagLogGroup",
+      "logs:UntagLogGroup",
+      "logs:ListTagsLogGroup"
+    ]
+    resources = [local.landings_log_group, "${local.landings_log_group}:*"]
+  }
+
+  # Reading a log group back, and the resource policy that lets EventBridge write to it.
+  # CloudWatch Logs scopes neither to one log group.
+  statement {
+    sid    = "DescribeLogGroupsAndPolicies"
+    effect = "Allow"
+    actions = [
+      "logs:DescribeLogGroups",
+      "logs:PutResourcePolicy",
+      "logs:DeleteResourcePolicy",
+      "logs:DescribeResourcePolicies"
+    ]
+    resources = ["*"]
   }
 
 }
