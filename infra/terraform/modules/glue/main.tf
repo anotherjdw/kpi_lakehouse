@@ -42,7 +42,6 @@ resource "aws_glue_job" "etl" {
   default_arguments = merge(
     {
       "--job-language"                     = "python"
-      "--enable-metrics"                   = "true"
       "--enable-continuous-cloudwatch-log" = "true"
       "--extra-py-files"                   = "s3://${var.scripts_bucket_name}/${var.package_object_key}"
       "--TempDir"                          = "s3://${var.scripts_bucket_name}/temp/"
