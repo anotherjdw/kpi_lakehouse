@@ -704,10 +704,16 @@ module "glue" {
 module "alerting" {
   source = "./modules/alerting"
 
-  name_prefix = local.name_prefix
-  environment = var.environment
-  alert_email = var.alert_email
-  tags        = var.tags
+  name_prefix  = local.name_prefix
+  data_product = var.data_product
+  environment  = var.environment
+  alert_email  = var.alert_email
+  tags         = var.tags
+
+  # 2 hours while K2 is tested, then the 26 a daily job needs.
+  missed_success_alarms = {
+    kpi_daily_sales = { missed_success_hours = 2 }
+  }
 }
 # --------------------------------------------------------------------------------------
 # Shop extract: Postgres -> raw layer, daily (network from the console-built shop setup)

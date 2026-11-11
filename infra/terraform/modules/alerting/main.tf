@@ -9,7 +9,14 @@ locals {
     Environment = var.environment
     ManagedBy   = "terraform"
   })
+
+  # Where Glue's continuous logging writes the driver's stdout, run records included: one
+  # log group shared by every Glue job in the account, one stream per run.
+  glue_output_log_group = "/aws-glue/jobs/output"
 }
+
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
 
 resource "aws_sns_topic" "alerts" {
   name = "${var.name_prefix}-alerts"
@@ -24,8 +31,8 @@ resource "aws_sns_topic_subscription" "email" {
 }
 
 # Replaces the topic's default policy. The Glue role publishes through its own IAM
-# policy (modules/iam), so the only statement needed here is for EventBridge, and
-# only from the stop rule.
+# policy (modules/iam), so the statements here are for the services: EventBridge, only
+# from the stop rule, and CloudWatch, only from this data product's alarms.
 data "aws_iam_policy_document" "alerts" {
   statement {
     sid       = "StopRulePublish"
@@ -40,6 +47,24 @@ data "aws_iam_policy_document" "alerts" {
       test     = "ArnEquals"
       variable = "aws:SourceArn"
       values   = [aws_cloudwatch_event_rule.glue_run_stopped.arn]
+    }
+  }
+
+  statement {
+    sid       = "AlarmsPublish"
+    effect    = "Allow"
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.alerts.arn]
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values = [
+        "arn:aws:cloudwatch:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alarm:${var.name_prefix}-*",
+      ]
     }
   }
 }
@@ -97,4 +122,49 @@ resource "aws_cloudwatch_event_target" "glue_run_stopped" {
       }
     TEMPLATE
   }
+}
+
+# Missed-success alarms (A2), one per job in var.missed_success_alarms. A metric filter
+# counts the job's SUCCEEDED run records, and the alarm fires when it has counted none for
+# missed_success_hours whole hours. Every term is quoted, the record's own quotes included,
+# so the Glue job name matches exactly and a longer name with the same start doesn't.
+resource "aws_cloudwatch_log_metric_filter" "succeeded_runs" {
+  for_each = var.missed_success_alarms
+
+  name           = "${var.name_prefix}-${each.key}-succeeded-runs"
+  log_group_name = local.glue_output_log_group
+  pattern = trimspace(<<-PATTERN
+    "RUN_RECORD" "\"status\": \"SUCCEEDED\"" "\"glue_job_name\": \"${var.name_prefix}-${each.key}\""
+  PATTERN
+  )
+
+  metric_transformation {
+    name      = "${each.key}-succeeded-runs"
+    namespace = "${var.data_product}/${var.environment}"
+    value     = "1"
+  }
+}
+
+# No data point means no successful run that hour, so missing data counts as breaching.
+# One message when it goes to ALARM, and one when a success brings it back to OK.
+resource "aws_cloudwatch_metric_alarm" "missed_success" {
+  for_each = var.missed_success_alarms
+
+  alarm_name        = "${var.name_prefix}-${each.key}-missed-success"
+  alarm_description = "${var.name_prefix}-${each.key} has written no SUCCEEDED run record for ${each.value.missed_success_hours} hours."
+
+  namespace           = "${var.data_product}/${var.environment}"
+  metric_name         = aws_cloudwatch_log_metric_filter.succeeded_runs[each.key].metric_transformation[0].name
+  statistic           = "Sum"
+  period              = 3600
+  evaluation_periods  = each.value.missed_success_hours
+  datapoints_to_alarm = each.value.missed_success_hours
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = local.common_tags
 }
