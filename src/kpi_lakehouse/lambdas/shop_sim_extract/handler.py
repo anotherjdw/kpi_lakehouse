@@ -29,6 +29,7 @@ import boto3
 
 from kpi_lakehouse.lambdas.common.contracts import Contract, fmt_ts, load_contracts
 from kpi_lakehouse.lambdas.common.db import connect
+from kpi_lakehouse.lambdas.common.run_record import lambda_run, phase
 from kpi_lakehouse.lambdas.common.sinks import RawWriter, S3Store
 
 from .tables import EXPORT_ONLY, table_columns
@@ -245,45 +246,66 @@ def save_watermarks(watermarks: dict[str, datetime], conn: Any) -> None:
 
 
 def handler(event: dict[str, Any] | None, context: object) -> dict[str, int]:
-    contracts = load_contracts()
-    run_at, upper, snapshot_date = extract_settings_from_env(event)
-    store = S3Store(
-        boto3.client("s3"), os.environ["DATA_BUCKET"], os.environ.get("RAW_PREFIX", "raw")
-    )
-    raw = RawWriter(store, contracts)
-    conn = connect()
-    summary: dict[str, int] = {}
+    """Export the shop's changed rows and snapshots to raw files, then move the watermarks.
 
-    watermarks: dict[str, datetime] = {}
-    for dataset in INCREMENTAL:
-        lower = read_watermark(conn, dataset)
-        rows = extract_incremental(conn, dataset, contracts, lower, upper)
+    Runs inside `lambda_run`, which prints one run record when the invocation ends, with
+    the rows written per dataset in its `metrics`.
 
-        for row in rows:
-            row = with_export_date(dataset, row)
-            write_rows(contracts, dataset, row, raw)
+    Args:
+        event: The invocation's payload; `snapshot_date` overrides the snapshot date.
+        context: Lambda's context object; None in local runs and tests.
 
-        watermarks[dataset] = upper
-        summary[dataset] = len(rows)
+    Returns:
+        The rows written per dataset.
+    """
+    with lambda_run(context, local_name="shop-sim-extract") as record:
+        summary: dict[str, int] = {}
+        record.metrics["rows"] = summary
 
-    for dataset in SNAPSHOT:
-        rows = extract_snapshot(conn, dataset, contracts)
-        for row in rows:
-            row = with_snapshot_date(snapshot_date, row)
-            write_rows(contracts, dataset, row, raw)
+        with phase(record, "connect"):
+            contracts = load_contracts()
+            run_at, upper, snapshot_date = extract_settings_from_env(event)
+            store = S3Store(
+                boto3.client("s3"), os.environ["DATA_BUCKET"], os.environ.get("RAW_PREFIX", "raw")
+            )
+            raw = RawWriter(store, contracts)
+            conn = connect()
 
-        summary[dataset] = len(rows)
+        watermarks: dict[str, datetime] = {}
+        with phase(record, "incremental"):
+            for dataset in INCREMENTAL:
+                lower = read_watermark(conn, dataset)
+                rows = extract_incremental(conn, dataset, contracts, lower, upper)
 
-    categories = extract_full_categories(conn, contracts)
+                for row in rows:
+                    row = with_export_date(dataset, row)
+                    write_rows(contracts, dataset, row, raw)
 
-    for row in categories:
-        write_rows(contracts, "categories", row, raw)
+                watermarks[dataset] = upper
+                summary[dataset] = len(rows)
 
-    summary["categories"] = len(categories)
-    raw.flush(tag=f"extract-{run_at:%Y%m%dT%H%M}")
+        with phase(record, "snapshot"):
+            for dataset in SNAPSHOT:
+                rows = extract_snapshot(conn, dataset, contracts)
+                for row in rows:
+                    row = with_snapshot_date(snapshot_date, row)
+                    write_rows(contracts, dataset, row, raw)
 
-    save_watermarks(watermarks, conn)
+                summary[dataset] = len(rows)
 
-    conn.close()
-    print(summary)
-    return summary
+        with phase(record, "categories"):
+            categories = extract_full_categories(conn, contracts)
+
+            for row in categories:
+                write_rows(contracts, "categories", row, raw)
+
+            summary["categories"] = len(categories)
+
+        with phase(record, "write"):
+            raw.flush(tag=f"extract-{run_at:%Y%m%dT%H%M}")
+
+        with phase(record, "watermarks"):
+            save_watermarks(watermarks, conn)
+
+        conn.close()
+        return summary
