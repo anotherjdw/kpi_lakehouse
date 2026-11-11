@@ -35,6 +35,11 @@ locals {
   project_workflows = "arn:aws:glue:*:${local.account_id}:workflow/${local.name_prefix}-*"
   project_topics    = "arn:aws:sns:*:${local.account_id}:${local.name_prefix}-*"
   project_rules     = "arn:aws:events:*:${local.account_id}:rule/${local.name_prefix}-*"
+  project_alarms    = "arn:aws:cloudwatch:*:${local.account_id}:alarm:${local.name_prefix}-*"
+
+  # The log group Glue writes every job's driver stdout to, which the missed-success
+  # metric filters read. It is shared by every Glue job in the account.
+  glue_output_log_group = "arn:aws:logs:*:${local.account_id}:log-group:/aws-glue/jobs/output"
 
   # Catalog names hold no hyphens: a layer's database is named after its bucket with
   # "-" turned into "_" (modules/catalog in the main stack).
@@ -174,6 +179,9 @@ data "aws_iam_policy_document" "plan_permissions" {
       "sns:List*",
       "events:Describe*",
       "events:List*",
+      "cloudwatch:Describe*",
+      "cloudwatch:List*",
+      "logs:Describe*",
     ]
     resources = ["*"]
   }
@@ -454,6 +462,34 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "events:ListTagsForResource"
     ]
     resources = [local.project_rules]
+  }
+
+  # The missed-success alarms (modules/alerting).
+  statement {
+    sid    = "ManageMissedSuccessAlarms"
+    effect = "Allow"
+    actions = [
+      "cloudwatch:PutMetricAlarm",
+      "cloudwatch:DeleteAlarms",
+      "cloudwatch:DescribeAlarms",
+      "cloudwatch:TagResource",
+      "cloudwatch:UntagResource",
+      "cloudwatch:ListTagsForResource"
+    ]
+    resources = [local.project_alarms]
+  }
+
+  # Their metric filters, on the shared Glue output log group: the filters are named with
+  # the project's prefix, but IAM can only scope these actions to the log group.
+  statement {
+    sid    = "ManageRunRecordFilters"
+    effect = "Allow"
+    actions = [
+      "logs:PutMetricFilter",
+      "logs:DeleteMetricFilter",
+      "logs:DescribeMetricFilters"
+    ]
+    resources = [local.glue_output_log_group, "${local.glue_output_log_group}:*"]
   }
 
 }

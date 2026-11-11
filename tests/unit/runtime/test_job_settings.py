@@ -21,6 +21,7 @@ from kpi_lakehouse.runtime.job_settings import (
     alert_message,
     alert_subject,
     alert_topic_arn,
+    emit_run_record,
     job_run,
     phase,
     run_outcome,
@@ -295,3 +296,34 @@ def test_message_gives_dates_run_id_and_console_link() -> None:
         "Run: https://eu-central-1.console.aws.amazon.com/gluestudio/home?region=eu-central-1"
         "#/job/kpi_lakehouse-prod-customers/run/jr_abc123"
     ) in message
+
+
+def test_record_puts_the_filtered_fields_in_its_first_1024_characters(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Glue cuts a stdout line into 1,024-character log events, and a metric filter matches one.
+
+    So the prefix, the Glue job name and the status come first, even when the processing
+    dates and a traceback make the record far longer, and no field is left out.
+    """
+    days = [f"2026-10-{day:02d}" for day in range(1, 32)]
+    record = RunRecord(
+        job_name="kpi_daily_sales",
+        started_at="2026-11-11T06:00:00+00:00",
+        processing_dates={"orders": days, "order_items": days, "returns": days},
+        status="SUCCEEDED",
+        glue_job_name="kpi_lakehouse-prod-kpi_daily_sales",
+        glue_run_id="jr_" + "a" * 64,
+        environment="prod",
+        traceback="x" * 4000,
+    )
+
+    emit_run_record(record)
+
+    line = capsys.readouterr().out.rstrip("\n")
+    first_event = line[:1024]
+    assert len(line) > 1024
+    assert first_event.startswith(f"{RUN_RECORD_PREFIX} ")
+    assert '"glue_job_name": "kpi_lakehouse-prod-kpi_daily_sales"' in first_event
+    assert '"status": "SUCCEEDED"' in first_event
+    assert set(emitted_records(line)[0]) == set(vars(record))
