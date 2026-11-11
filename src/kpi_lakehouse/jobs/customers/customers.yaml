@@ -8,7 +8,7 @@ job:
   description: Versioned customer data.
   glue:
     worker_type: G.1X
-    number_of_workers: 10
+    number_of_workers: 5
   processing:
     type: lookback        # lookback | backfill; applies to every source's dates
   sources:
@@ -17,7 +17,7 @@ job:
       alias: customers
       allow_empty: false  # true lets this source read no rows without failing the run
       # The dates this source reads, if it is partitioned by date; an unpartitioned source sets none.
-      lookback_days: 2    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      lookback_days: 9    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
       # start_date: 2026-01-01   # YYYY-MM-DD; set both dates when type is backfill, neither for lookback
       # end_date: 2026-01-01     # backfill processes every day from start_date to end_date
   sink:

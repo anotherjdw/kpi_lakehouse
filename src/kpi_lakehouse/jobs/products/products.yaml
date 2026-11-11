@@ -16,7 +16,7 @@ job:
       # job: <job name>   # instead of contract, to read another job's output; create that job first
       alias: products
       allow_empty: false  # true lets this source read no rows without failing the run
-      lookback_days: 2    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      lookback_days: 9    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
   sink:
     contract: products   # the output contract: contracts/products_data_contract.yaml
     write_mode: overwrite     # the only mode: replaces the partitions present in the output
