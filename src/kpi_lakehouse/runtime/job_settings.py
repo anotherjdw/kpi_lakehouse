@@ -35,6 +35,10 @@ ALERT_PUBLISH_FAILED_PREFIX = "ALERT_PUBLISH_FAILED"
 RUN_WATCH_FAILED_PREFIX = "RUN_WATCH_FAILED"
 DATA_PRODUCT = "kpi_lakehouse"
 
+# The run record's fields printed first, so they always land in the first 1,024 characters,
+# the first log event Glue cuts the line into; see `emit_run_record`.
+RECORD_FIRST_KEYS = ("status", "glue_job_name", "glue_run_id", "job_name", "environment", "phase")
+
 # SNS refuses a subject longer than this.
 SUBJECT_MAX_LENGTH = 100
 
@@ -298,11 +302,18 @@ def emit_run_record(record: RunRecord) -> None:
     filter or a Logs Insights query without having to parse it out of the
     surrounding Spark noise.
 
+    Glue's continuous logging cuts a stdout line into log events of 1,024 characters, and a
+    metric filter matches one event at a time. So the fields a filter matches on come first,
+    in `RECORD_FIRST_KEYS`, and every other field follows in alphabetical order.
+
     This record is for humans and observability only. Orchestration keys off
     Glue's own job-run state, which is set by the script's exit code -- which
     is why `job_run` re-raises rather than reporting failure only here.
     """
-    payload = json.dumps(asdict(record), default=str, sort_keys=True)
+    fields = asdict(record)
+    ordered = {key: fields.pop(key) for key in RECORD_FIRST_KEYS}
+    ordered.update(sorted(fields.items()))
+    payload = json.dumps(ordered, default=str)
     print(f"{RUN_RECORD_PREFIX} {payload}", flush=True)
 
 

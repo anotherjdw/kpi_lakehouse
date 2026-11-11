@@ -114,16 +114,17 @@ planned (see [Limitations and Next Steps](#limitations-and-next-steps)).
 
 ```json
 {
-  "duration_seconds": 21.458,
-  "environment": "prod",
-  "error_message": "Data validation failed: nulls in non-nullable columns {'rate_date': 317, 'base_currency': 317, 'quote_currency': 317, 'rate': 317, 'shipping_fee_eur': 317}",
-  "error_type": "ValueError",
-  "finished_at": "2026-11-06T19:41:12+00:00",
+  "status": "FAILED",
   "glue_job_name": "kpi_lakehouse-prod-orders",
   "glue_run_id": "jr_2aec0c3598168e63428c932dd80f28ed510e19f9b823b1e85412f97f4b7d1daf",
   "job_name": "orders",
-  "metrics": {},
+  "environment": "prod",
   "phase": "write",
+  "duration_seconds": 21.458,
+  "error_message": "Data validation failed: nulls in non-nullable columns {'rate_date': 317, 'base_currency': 317, 'quote_currency': 317, 'rate': 317, 'shipping_fee_eur': 317}",
+  "error_type": "ValueError",
+  "finished_at": "2026-11-06T19:41:12+00:00",
+  "metrics": {},
   "phase_durations": {
     "read": 15.011,
     "transform": 2.261,
@@ -134,7 +135,6 @@ planned (see [Limitations and Next Steps](#limitations-and-next-steps)).
     "orders": ["2026-10-23", "...", "2026-11-05"]
   },
   "started_at": "2026-11-06T19:40:50+00:00",
-  "status": "FAILED",
   "traceback": "Traceback (most recent call last):\n  File \".../runtime/job_settings.py\", line 111, in job_run\n    yield record\n  File \".../orders.py\", line 37, in run\n    job.write(output, args.OUTPUT_PATH, args.OUTPUT_TABLE)\n  File \".../jobs/orders/orders_transformations.py\", line 216, in write\n    validate_pyspark_dataframe(\n  File \".../utils/dataframes.py\", line 85, in validate_pyspark_dataframe\n    raise ValueError(\nValueError: Data validation failed: nulls in non-nullable columns {...}\n"
 }
 ```
@@ -142,16 +142,17 @@ planned (see [Limitations and Next Steps](#limitations-and-next-steps)).
 
 ```json
 {
-  "duration_seconds": 54.423,
-  "environment": "prod",
-  "error_message": null,
-  "error_type": null,
-  "finished_at": "2026-11-08T06:04:16+00:00",
+  "status": "SUCCEEDED",
   "glue_job_name": "kpi_lakehouse-prod-orders",
   "glue_run_id": "jr_7b13fd075dd0b5be765b8d9a9cc936da21daf2c0f87cf7053b05c8e82383b8d6",
   "job_name": "orders",
-  "metrics": {},
+  "environment": "prod",
   "phase": null,
+  "duration_seconds": 54.423,
+  "error_message": null,
+  "error_type": null,
+  "finished_at": "2026-11-08T06:04:16+00:00",
+  "metrics": {},
   "phase_durations": {
     "read": 29.947,
     "transform": 2.493,
@@ -162,7 +163,6 @@ planned (see [Limitations and Next Steps](#limitations-and-next-steps)).
     "orders": ["2026-10-25", "...", "2026-11-07"]
   },
   "started_at": "2026-11-08T06:03:22+00:00",
-  "status": "SUCCEEDED",
   "traceback": null
 }
 ```
