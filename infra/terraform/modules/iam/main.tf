@@ -92,6 +92,25 @@ resource "aws_iam_role_policy_attachment" "s3_access" {
 }
 
 #-------------------------
+# Alerts
+#-------------------------
+
+data "aws_iam_policy_document" "glue_alerts" {
+  statement {
+    sid       = "AlertTopicPublish"
+    effect    = "Allow"
+    actions   = ["sns:Publish"]
+    resources = [var.alert_topic_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "glue_alerts" {
+  name   = "glue-alerts"
+  role   = aws_iam_role.glue_execution.id
+  policy = data.aws_iam_policy_document.glue_alerts.json
+}
+
+#-------------------------
 # Extraction IAM role
 #--------------------------
 

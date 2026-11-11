@@ -62,3 +62,11 @@ variable "db_host" {
   description = "Writer endpoint of the shop's Aurora cluster, which the extract Lambda reads from."
   type        = string
 }
+
+# Not in env.tfvars, since this repository is public: CI passes it from the ALERT_EMAIL
+# secret as TF_VAR_alert_email, and a local plan needs TF_VAR_alert_email set.
+variable "alert_email" {
+  description = "Email addresses subscribed to the alert topic, one subscription each."
+  type        = list(string)
+  sensitive   = true
+}

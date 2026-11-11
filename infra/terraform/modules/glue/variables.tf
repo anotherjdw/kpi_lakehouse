@@ -60,3 +60,8 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "alert_topic_arn" {
+  description = "ARN of the alert topic, passed to every job as --ALERT_TOPIC_ARN"
+  type        = string
+}

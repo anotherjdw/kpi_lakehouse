@@ -429,7 +429,12 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "sns:SetTopicAttributes",
       "sns:TagResource",
       "sns:UntagResource",
-      "sns:ListTagsForResource"
+      "sns:ListTagsForResource",
+      "sns:Subscribe",
+      "sns:Unsubscribe",
+      "sns:GetSubscriptionAttributes",
+      "sns:SetSubscriptionAttributes",
+      "sns:ListSubscriptionsByTopic"
     ]
     resources = [local.project_topics] # restricted to the SNS topics related to this data pipeline.
   }

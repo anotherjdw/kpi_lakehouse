@@ -7,7 +7,8 @@
 # jobs' outputs runs once every one of them has succeeded in the same workflow
 # run (var.conditional_triggers). Every job runs with the Glue Data Catalog as its
 # Spark catalog (--enable-glue-datacatalog), where a job whose output has a Hive
-# table registers the partitions it wrote.
+# table registers the partitions it wrote. Every job stops after 60 minutes, and
+# gets the alert topic as --ALERT_TOPIC_ARN, where it publishes its own alerts.
 
 locals {
   common_tags = merge(var.tags, {
@@ -23,6 +24,7 @@ resource "aws_glue_job" "etl" {
   role_arn     = var.role_arn
   glue_version = "5.0"
   max_retries  = 0
+  timeout      = 60
 
   worker_type       = each.value.glue.worker_type
   number_of_workers = each.value.glue.number_of_workers
@@ -46,6 +48,7 @@ resource "aws_glue_job" "etl" {
       "--TempDir"                          = "s3://${var.scripts_bucket_name}/temp/"
       "--enable-glue-datacatalog"          = "true"
       "--environment"                      = var.environment
+      "--ALERT_TOPIC_ARN"                  = var.alert_topic_arn
     },
     { for k, v in each.value.arguments : "--${k}" => v },
   )

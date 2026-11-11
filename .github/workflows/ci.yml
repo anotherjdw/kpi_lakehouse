@@ -11,6 +11,8 @@
 #   - secrets AWS_PLAN_ROLE_ARN, AWS_DEPLOY_ROLE_ARN, AWS_SCRIPTS_ROLE_ARN
 #     (populated from the infra/terraform/bootstrap outputs)
 #   - variable AWS_REGION -- the region CI assumes its roles in / deploys to
+#   - secret ALERT_EMAIL -- the addresses subscribed to the alert topic,
+# kept out of the public repository.
 name: CI/CD
 
 on:
@@ -136,6 +138,8 @@ jobs:
 
       - name: Terraform plan
         working-directory: infra/terraform
+        env:
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: terraform plan -var-file=env.tfvars -out=tfplan
 
       - name: Render plan text
