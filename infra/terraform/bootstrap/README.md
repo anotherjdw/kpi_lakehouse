@@ -10,9 +10,9 @@
 This Terraform root provisions three IAM roles GitHub Actions assumes via OIDC (no
 long-lived AWS keys are ever stored in the repo): a read-only `plan` role, a `deploy`
 role scoped to the `prod` GitHub Environment, and a `scripts` role that only
-uploads to the scripts bucket. It keeps its own Terraform state, separate from the main
-stack's -- the `deploy` role it creates is what applies the main stack, so it must never
-be created by the stack it applies.
+uploads to the scripts bucket. It also provisions resources for CloudTrail, to be used in alerting and observability.
+It keeps its own Terraform state, separate from the main stack's -- the `deploy` role it creates is what applies the
+main stack, so it must never be created by the stack it applies.
 
 ## One-time setup
 
