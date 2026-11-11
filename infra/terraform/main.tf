@@ -42,6 +42,7 @@ module "iam" {
   tags                    = var.tags
   raw_data_bucket         = module.s3.bucket_names["raw"]
   db_cluster_resource_id  = var.db_cluster_resource_id
+  alert_topic_arn         = module.alerting.topic_arn
 }
 
 module "catalog" {
@@ -407,6 +408,7 @@ module "glue" {
   environment         = var.environment
   role_arn            = module.iam.glue_execution_role_arn
   scripts_bucket_name = module.s3.bucket_names["scripts"]
+  alert_topic_arn     = module.alerting.topic_arn
   tags                = var.tags
 
   # ---------------------------------------------------------------------------
@@ -697,6 +699,15 @@ module "glue" {
   # <<< AMEND:JOBS
   # END ETL jobs and triggers
   # ---------------------------------------------------------------------------
+}
+
+module "alerting" {
+  source = "./modules/alerting"
+
+  name_prefix = local.name_prefix
+  environment = var.environment
+  alert_email = var.alert_email
+  tags        = var.tags
 }
 # --------------------------------------------------------------------------------------
 # Shop extract: Postgres -> raw layer, daily (network from the console-built shop setup)

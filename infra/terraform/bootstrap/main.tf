@@ -1,5 +1,5 @@
-# main.tf -- CI/CD identities for kpi_lakehouse, provisioned as code.
-# Creates the GitHub OIDC provider and three least-privilege roles the data
+# main.tf -- CI/CD identities for kpi_lakehouse, and adds the account's CloudTrail trail,
+# provisioned as code. Creates the GitHub OIDC provider and three least-privilege roles the data
 # product's GitHub Actions workflow assumes: plan (read-only), deploy
 # (apply the main stack), and scripts (upload artifacts). See README.md.
 
@@ -33,6 +33,8 @@ locals {
   project_jobs      = "arn:aws:glue:*:${local.account_id}:job/${local.name_prefix}-*"
   project_triggers  = "arn:aws:glue:*:${local.account_id}:trigger/${local.name_prefix}-*"
   project_workflows = "arn:aws:glue:*:${local.account_id}:workflow/${local.name_prefix}-*"
+  project_topics    = "arn:aws:sns:*:${local.account_id}:${local.name_prefix}-*"
+  project_rules     = "arn:aws:events:*:${local.account_id}:rule/${local.name_prefix}-*"
 
   # Catalog names hold no hyphens: a layer's database is named after its bucket with
   # "-" turned into "_" (modules/catalog in the main stack).
@@ -41,6 +43,13 @@ locals {
   project_databases = "arn:aws:glue:*:${local.account_id}:database/${local.catalog_prefix}_*"
   project_tables    = "arn:aws:glue:*:${local.account_id}:table/${local.catalog_prefix}_*/*"
   project_functions = "arn:aws:glue:*:${local.account_id}:userDefinedFunction/${local.catalog_prefix}_*/*"
+
+  # The account's CloudTrail trail and its bucket. The names hold no project prefix,
+  # they are for the whole account, and the deploy role's bucket permissions (local.project_buckets)
+  # must not reach its bucket.
+  trail_name   = "management-events"
+  trail_arn    = "arn:aws:cloudtrail:${var.aws_region}:${local.account_id}:trail/${local.trail_name}"
+  trail_bucket = "cloudtrail-${local.account_id}-${var.aws_region}"
 }
 
 # ---------------------------------------------------------------------------
@@ -161,6 +170,10 @@ data "aws_iam_policy_document" "plan_permissions" {
       "glue:Get*",
       "glue:List*",
       "glue:BatchGet*",
+      "sns:Get*",
+      "sns:List*",
+      "events:Describe*",
+      "events:List*",
     ]
     resources = ["*"]
   }
@@ -406,6 +419,43 @@ data "aws_iam_policy_document" "deploy_permissions" {
     actions   = ["ec2:Describe*"]
     resources = ["*"]
   }
+  statement {
+    sid    = "ManageAlertTopic"
+    effect = "Allow"
+    actions = [
+      "sns:CreateTopic",
+      "sns:DeleteTopic",
+      "sns:GetTopicAttributes",
+      "sns:SetTopicAttributes",
+      "sns:TagResource",
+      "sns:UntagResource",
+      "sns:ListTagsForResource",
+      "sns:Subscribe",
+      "sns:Unsubscribe",
+      "sns:GetSubscriptionAttributes",
+      "sns:SetSubscriptionAttributes",
+      "sns:ListSubscriptionsByTopic"
+    ]
+    resources = [local.project_topics] # restricted to the SNS topics related to this data pipeline.
+  }
+
+  statement {
+    sid    = "ManageAlertRules"
+    effect = "Allow"
+    actions = [
+      "events:PutRule",
+      "events:DeleteRule",
+      "events:DescribeRule",
+      "events:PutTargets",
+      "events:RemoveTargets",
+      "events:ListTargetsByRule",
+      "events:TagResource",
+      "events:UntagResource",
+      "events:ListTagsForResource"
+    ]
+    resources = [local.project_rules]
+  }
+
 }
 
 data "aws_iam_policy_document" "scripts_permissions" {
@@ -423,6 +473,102 @@ data "aws_iam_policy_document" "scripts_permissions" {
     resources = ["arn:aws:s3:::${local.scripts_bucket}"]
   }
 }
+
+# ---------------------------------------------------------------------------
+# CloudTrail trail
+# ---------------------------------------------------------------------------
+
+# EventBridge only receives API calls ("AWS API Call via CloudTrail") while a trail is
+# logging, so the main stack's stop alert (a rule on glue:BatchStopJobRun) needs one. It
+# serves the whole account, so it lives here, applied by an admin, not in the main stack.
+# It logs management events that change something (WriteOnly), in this region only.
+
+resource "aws_s3_bucket" "trail" {
+  bucket = local.trail_bucket
+  tags   = { Component = "cloudtrail" }
+}
+
+resource "aws_s3_bucket_public_access_block" "trail" {
+  bucket                  = aws_s3_bucket.trail.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "trail" {
+  bucket = aws_s3_bucket.trail.id
+
+  rule {
+    id     = "expire-logs"
+    status = "Enabled"
+    filter {}
+    expiration {
+      days = 90
+    }
+  }
+}
+
+data "aws_iam_policy_document" "trail_bucket" {
+  statement {
+    sid    = "CloudTrailAclCheck"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+    actions   = ["s3:GetBucketAcl"]
+    resources = [aws_s3_bucket.trail.arn]
+    condition {
+      test     = "StringEquals"
+      values   = [local.trail_arn]
+      variable = "aws:SourceArn"
+    }
+  }
+
+  statement {
+    sid    = "CloudTrailWrite"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.trail.arn}/AWSLogs/${local.account_id}/*"]
+    condition {
+      test     = "StringEquals"
+      values   = ["bucket-owner-full-control"]
+      variable = "s3:x-amz-acl"
+    }
+    condition {
+      test     = "StringEquals"
+      values   = [local.trail_arn]
+      variable = "aws:SourceArn"
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "trail" {
+  bucket = aws_s3_bucket.trail.id
+  policy = data.aws_iam_policy_document.trail_bucket.json
+}
+
+resource "aws_cloudtrail" "management" {
+  name                  = local.trail_name
+  s3_bucket_name        = aws_s3_bucket.trail.id
+  is_multi_region_trail = false
+
+  event_selector {
+    read_write_type           = "WriteOnly"
+    include_management_events = true
+  }
+
+  tags = { Component = "cloudtrail" }
+
+  # CloudTrail checks the bucket policy when the trail is created.
+  depends_on = [aws_s3_bucket_policy.trail]
+}
+
 
 # ---------------------------------------------------------------------------
 # Roles

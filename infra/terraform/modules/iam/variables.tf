@@ -51,3 +51,8 @@ variable "db_user" {
   type        = string
   default     = "simulator"
 }
+
+variable "alert_topic_arn" {
+  description = "ARN of the alert topic. Glue is granted sns:Publish on it"
+  type        = string
+}
