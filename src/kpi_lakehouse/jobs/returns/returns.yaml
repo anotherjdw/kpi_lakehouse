@@ -15,11 +15,11 @@ job:
     - contract: returns_raw
       alias: returns
       allow_empty: false  # true lets this source read no rows without failing the run
-      lookback_days: 45    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      lookback_days: 52    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
     - job: order_items
       alias: order_items
       allow_empty: false
-      lookback_days: 45
+      lookback_days: 52
   sink:
     contract: returns   # the output contract: contracts/returns_data_contract.yaml
     write_mode: overwrite     # the only mode: replaces the partitions present in the output

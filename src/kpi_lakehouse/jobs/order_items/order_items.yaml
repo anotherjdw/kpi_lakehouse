@@ -15,12 +15,12 @@ job:
     - contract: order_items_raw
       alias: order_items
       allow_empty: false
-      lookback_days: 14
+      lookback_days: 21
     - job: orders   # instead of contract, to read another job's output; create that job first
       alias: orders
       allow_empty: false  # true lets this source read no rows without failing the run
       # The dates this source reads, if it is partitioned by date; an unpartitioned source sets none.
-      lookback_days: 14    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      lookback_days: 21   # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
       # start_date: 2026-01-01   # YYYY-MM-DD; set both dates when type is backfill, neither for lookback
       # end_date: 2026-01-01     # backfill processes every day from start_date to end_date
   sink:

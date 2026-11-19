@@ -17,7 +17,7 @@ job:
       alias: session_events
       allow_empty: false  # true lets this source read no rows without failing the run
       # The dates this source reads, if it is partitioned by date; an unpartitioned source sets none.
-      lookback_days: 2    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
+      lookback_days: 9    # lookback only, 1 when not set: complete days ending yesterday; 0 processes the current date only
   sink:
     contract: sessions   # the output contract: contracts/sessions_data_contract.yaml
     write_mode: overwrite     # the only mode: replaces the partitions present in the output

@@ -15,15 +15,15 @@ job:
     - job: orders
       alias: orders
       allow_empty: false  # true lets this source read no rows without failing the run
-      lookback_days: 45
+      lookback_days: 52
     - job: order_items
       alias: order_items
       allow_empty: false
-      lookback_days: 45
+      lookback_days: 52
     - job: returns
       alias: returns
       allow_empty: false
-      lookback_days: 45
+      lookback_days: 52
     - job: dim_customer
       alias: dim_customer
       allow_empty: false
@@ -35,7 +35,7 @@ job:
     - job: sessions
       alias: sessions
       allow_empty: false
-      lookback_days: 75
+      lookback_days: 82
   sink:
     contract: fact_order_line   # the output contract: contracts/fact_order_line_data_contract.yaml
     write_mode: overwrite     # the only mode: replaces the partitions present in the output

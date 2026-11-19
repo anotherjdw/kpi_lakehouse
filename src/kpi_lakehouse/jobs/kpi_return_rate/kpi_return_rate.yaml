@@ -15,7 +15,7 @@ job:
     - job: fact_order_line
       alias: fact_order_line
       allow_empty: false  # true lets this source read no rows without failing the run
-      lookback_days: 77
+      lookback_days: 84
     - job: dim_product
       alias: dim_product
       allow_empty: false

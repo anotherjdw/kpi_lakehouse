@@ -15,7 +15,7 @@ job:
     - job: fact_order_line
       alias: fact_order_line
       allow_empty: false  # true lets this source read no rows without failing the run
-      lookback_days: 45
+      lookback_days: 52
   sink:
     contract: kpi_daily_sales   # the output contract: contracts/kpi_daily_sales_data_contract.yaml
     write_mode: overwrite     # the only mode: replaces the partitions present in the output

@@ -15,7 +15,7 @@ job:
     - job: sessions
       alias: sessions
       allow_empty: false  # true lets this source read no rows without failing the run
-      lookback_days: 2
+      lookback_days: 9
     - job: dim_customer
       alias: dim_customer
       allow_empty: false

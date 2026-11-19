@@ -16,7 +16,7 @@ job:
       # job: <job name>   # instead of contract, to read another job's output; create that job first
       alias: session_events
       allow_empty: false  # true lets this source read no rows without failing the run
-      lookback_days: 2
+      lookback_days: 9
   sink:
     contract: session_events   # the output contract: contracts/session_events_data_contract.yaml
     write_mode: overwrite     # the only mode: replaces the partitions present in the output

@@ -433,7 +433,7 @@ module "glue" {
       }
       arguments = {
         CUSTOMERS_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/customers/"
-        CUSTOMERS_LOOKBACK_DAYS = "2"
+        CUSTOMERS_LOOKBACK_DAYS = "9"
         OUTPUT_PATH             = "s3://${module.s3.bucket_names["preprocessed"]}/customers/"
         OUTPUT_TABLE            = "${module.catalog.table_names["preprocessed/customers"]}"
         PROCESSING_TYPE         = "lookback"
@@ -488,16 +488,16 @@ module "glue" {
         DIM_PRODUCT_INPUT_PATH     = "s3://${module.s3.bucket_names["processed"]}/dim_product/"
         DIM_PRODUCT_LOOKBACK_DAYS  = "550"
         ORDERS_INPUT_PATH          = "s3://${module.s3.bucket_names["preprocessed"]}/orders/"
-        ORDERS_LOOKBACK_DAYS       = "45"
+        ORDERS_LOOKBACK_DAYS       = "52"
         ORDER_ITEMS_INPUT_PATH     = "s3://${module.s3.bucket_names["preprocessed"]}/order_items/"
-        ORDER_ITEMS_LOOKBACK_DAYS  = "45"
+        ORDER_ITEMS_LOOKBACK_DAYS  = "52"
         OUTPUT_PATH                = "s3://${module.s3.bucket_names["processed"]}/fact_order_line/"
         OUTPUT_TABLE               = "${module.catalog.table_names["processed/fact_order_line"]}"
         PROCESSING_TYPE            = "lookback"
         RETURNS_INPUT_PATH         = "s3://${module.s3.bucket_names["preprocessed"]}/returns/"
-        RETURNS_LOOKBACK_DAYS      = "45"
+        RETURNS_LOOKBACK_DAYS      = "52"
         SESSIONS_INPUT_PATH        = "s3://${module.s3.bucket_names["preprocessed"]}/sessions/"
-        SESSIONS_LOOKBACK_DAYS     = "75"
+        SESSIONS_LOOKBACK_DAYS     = "82"
       }
     }
     fact_session = {
@@ -512,7 +512,7 @@ module "glue" {
         OUTPUT_TABLE               = "${module.catalog.table_names["processed/fact_session"]}"
         PROCESSING_TYPE            = "lookback"
         SESSIONS_INPUT_PATH        = "s3://${module.s3.bucket_names["preprocessed"]}/sessions/"
-        SESSIONS_LOOKBACK_DAYS     = "2"
+        SESSIONS_LOOKBACK_DAYS     = "9"
       }
     }
     fx_rates = {
@@ -523,7 +523,7 @@ module "glue" {
       arguments = {
         DATES_INPUT_PATH       = "s3://${module.s3.bucket_names["raw"]}/dates/"
         FX_RATES_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/fx_rates/"
-        FX_RATES_LOOKBACK_DAYS = "14"
+        FX_RATES_LOOKBACK_DAYS = "21"
         OUTPUT_PATH            = "s3://${module.s3.bucket_names["preprocessed"]}/fx_rates/"
         OUTPUT_TABLE           = "${module.catalog.table_names["preprocessed/fx_rates"]}"
         PROCESSING_TYPE        = "lookback"
@@ -536,11 +536,11 @@ module "glue" {
       }
       arguments = {
         FACT_ORDER_LINE_INPUT_PATH    = "s3://${module.s3.bucket_names["processed"]}/fact_order_line/"
-        FACT_ORDER_LINE_LOOKBACK_DAYS = "45"
+        FACT_ORDER_LINE_LOOKBACK_DAYS = "52"
         FACT_SESSION_INPUT_PATH       = "s3://${module.s3.bucket_names["processed"]}/fact_session/"
-        FACT_SESSION_LOOKBACK_DAYS    = "45"
+        FACT_SESSION_LOOKBACK_DAYS    = "52"
         MARKETING_SPEND_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/marketing_spend/"
-        MARKETING_SPEND_LOOKBACK_DAYS = "45"
+        MARKETING_SPEND_LOOKBACK_DAYS = "52"
         OUTPUT_PATH                   = "s3://${module.s3.bucket_names["processed"]}/kpi_channel_performance/"
         OUTPUT_TABLE                  = "${module.catalog.table_names["processed/kpi_channel_performance"]}"
         PROCESSING_TYPE               = "lookback"
@@ -553,7 +553,7 @@ module "glue" {
       }
       arguments = {
         FACT_ORDER_LINE_INPUT_PATH    = "s3://${module.s3.bucket_names["processed"]}/fact_order_line/"
-        FACT_ORDER_LINE_LOOKBACK_DAYS = "45"
+        FACT_ORDER_LINE_LOOKBACK_DAYS = "52"
         OUTPUT_PATH                   = "s3://${module.s3.bucket_names["processed"]}/kpi_daily_sales/"
         OUTPUT_TABLE                  = "${module.catalog.table_names["processed/kpi_daily_sales"]}"
         PROCESSING_TYPE               = "lookback"
@@ -568,7 +568,7 @@ module "glue" {
         DIM_PRODUCT_INPUT_PATH        = "s3://${module.s3.bucket_names["processed"]}/dim_product/"
         DIM_PRODUCT_LOOKBACK_DAYS     = "1095"
         FACT_ORDER_LINE_INPUT_PATH    = "s3://${module.s3.bucket_names["processed"]}/fact_order_line/"
-        FACT_ORDER_LINE_LOOKBACK_DAYS = "77"
+        FACT_ORDER_LINE_LOOKBACK_DAYS = "84"
         OUTPUT_PATH                   = "s3://${module.s3.bucket_names["processed"]}/kpi_return_rate/"
         OUTPUT_TABLE                  = "${module.catalog.table_names["processed/kpi_return_rate"]}"
         PROCESSING_TYPE               = "lookback"
@@ -581,9 +581,9 @@ module "glue" {
       }
       arguments = {
         FX_RATES_INPUT_PATH           = "s3://${module.s3.bucket_names["preprocessed"]}/fx_rates/"
-        FX_RATES_LOOKBACK_DAYS        = "1"
+        FX_RATES_LOOKBACK_DAYS        = "9"
         MARKETING_SPEND_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/marketing_spend/"
-        MARKETING_SPEND_LOOKBACK_DAYS = "1"
+        MARKETING_SPEND_LOOKBACK_DAYS = "9"
         OUTPUT_PATH                   = "s3://${module.s3.bucket_names["preprocessed"]}/marketing_spend/"
         OUTPUT_TABLE                  = "${module.catalog.table_names["preprocessed/marketing_spend"]}"
         PROCESSING_TYPE               = "lookback"
@@ -596,9 +596,9 @@ module "glue" {
       }
       arguments = {
         ORDERS_INPUT_PATH         = "s3://${module.s3.bucket_names["preprocessed"]}/orders/"
-        ORDERS_LOOKBACK_DAYS      = "14"
+        ORDERS_LOOKBACK_DAYS      = "21"
         ORDER_ITEMS_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/order_items/"
-        ORDER_ITEMS_LOOKBACK_DAYS = "14"
+        ORDER_ITEMS_LOOKBACK_DAYS = "21"
         OUTPUT_PATH               = "s3://${module.s3.bucket_names["preprocessed"]}/order_items/"
         OUTPUT_TABLE              = "${module.catalog.table_names["preprocessed/order_items"]}"
         PROCESSING_TYPE           = "lookback"
@@ -611,9 +611,9 @@ module "glue" {
       }
       arguments = {
         FX_RATES_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/fx_rates/"
-        FX_RATES_LOOKBACK_DAYS = "60"
+        FX_RATES_LOOKBACK_DAYS = "67"
         ORDERS_INPUT_PATH      = "s3://${module.s3.bucket_names["raw"]}/orders/"
-        ORDERS_LOOKBACK_DAYS   = "14"
+        ORDERS_LOOKBACK_DAYS   = "21"
         OUTPUT_PATH            = "s3://${module.s3.bucket_names["preprocessed"]}/orders/"
         OUTPUT_TABLE           = "${module.catalog.table_names["preprocessed/orders"]}"
         PROCESSING_TYPE        = "lookback"
@@ -629,7 +629,7 @@ module "glue" {
         OUTPUT_TABLE           = "${module.catalog.table_names["preprocessed/products"]}"
         PROCESSING_TYPE        = "lookback"
         PRODUCTS_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/products/"
-        PRODUCTS_LOOKBACK_DAYS = "2"
+        PRODUCTS_LOOKBACK_DAYS = "9"
       }
     }
     returns = {
@@ -639,12 +639,12 @@ module "glue" {
       }
       arguments = {
         ORDER_ITEMS_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/order_items/"
-        ORDER_ITEMS_LOOKBACK_DAYS = "45"
+        ORDER_ITEMS_LOOKBACK_DAYS = "52"
         OUTPUT_PATH               = "s3://${module.s3.bucket_names["preprocessed"]}/returns/"
         OUTPUT_TABLE              = "${module.catalog.table_names["preprocessed/returns"]}"
         PROCESSING_TYPE           = "lookback"
         RETURNS_INPUT_PATH        = "s3://${module.s3.bucket_names["raw"]}/returns/"
-        RETURNS_LOOKBACK_DAYS     = "45"
+        RETURNS_LOOKBACK_DAYS     = "52"
       }
     }
     session_events = {
@@ -657,7 +657,7 @@ module "glue" {
         OUTPUT_TABLE                 = "${module.catalog.table_names["preprocessed/session_events"]}"
         PROCESSING_TYPE              = "lookback"
         SESSION_EVENTS_INPUT_PATH    = "s3://${module.s3.bucket_names["raw"]}/session_events/"
-        SESSION_EVENTS_LOOKBACK_DAYS = "2"
+        SESSION_EVENTS_LOOKBACK_DAYS = "9"
       }
     }
     sessions = {
@@ -670,14 +670,14 @@ module "glue" {
         OUTPUT_TABLE                 = "${module.catalog.table_names["preprocessed/sessions"]}"
         PROCESSING_TYPE              = "lookback"
         SESSION_EVENTS_INPUT_PATH    = "s3://${module.s3.bucket_names["preprocessed"]}/session_events/"
-        SESSION_EVENTS_LOOKBACK_DAYS = "2"
+        SESSION_EVENTS_LOOKBACK_DAYS = "9"
       }
     }
   }
 
   workflows = {
     daily = {
-      schedule = "cron(0 6 * * ? *)"
+      schedule = "cron(0 6 ? * FRI *)"
       jobs     = ["categories", "customers", "fx_rates", "products", "session_events"]
     }
   }
@@ -710,13 +710,13 @@ module "alerting" {
   alert_email  = var.alert_email
   tags         = var.tags
 
-  # 2 hours while K2 is tested, then the 26 a daily job needs.
-  missed_success_alarms = {
-    kpi_daily_sales = { missed_success_hours = 26 }
-  }
+  # None while the Glue workflow runs weekly: a CloudWatch alarm can look back at most 7 days
+  # (168 hours), too short to catch a missed weekly run. Failed and stopped runs still alert:
+  # the Glue jobs publish their own failure and stop alerts to the topic.
+  missed_success_alarms = {}
 
-  # Ingestion (A5a and A5b): 2 hours while K3 is tested, then 26 for a daily extract and
-  # for sources that land once a day.
+  # Ingestion (A5a and A5b): 26 hours (24 + 2) for the daily extract and for sources that
+  # still land once a day, whatever the Glue workflow's schedule.
   bucket_names = module.s3.bucket_names
   ingestion_alarms = {
     "shop-sim-extract" = { missed_success_hours = 26 }
