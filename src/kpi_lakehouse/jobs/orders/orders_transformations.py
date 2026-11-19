@@ -173,6 +173,7 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             file_format="json",
             date_ranges=processing_dates["orders"],
             partition_key="export_date",
+            check_files=True,
         ),
         "fx_rates": create_pyspark_dataframe(
             spark=spark,
@@ -197,6 +198,7 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             "To allow this, set allow_empty: true on this source in "
             "orders.yaml."
         )
+    validate_pyspark_dataframe(sources["orders"], schema_definitions.orders_raw_schema)
     return sources
 
 
@@ -213,11 +215,7 @@ def write(output: DataFrame, output_file_path: str, output_table: str) -> None:
     """Check the output against its contract, write it as parquet, then register its partitions."""
     output = output.persist()
     try:
-        validate_pyspark_dataframe(
-            output,
-            schema_definitions.orders_schema,
-            unique_key=["order_id", "updated_at"],
-        )
+        validate_pyspark_dataframe(output, schema_definitions.orders_schema)
         write_pyspark_dataframe(
             output_dataframe=output,
             output_file_path=output_file_path,

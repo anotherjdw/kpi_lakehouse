@@ -210,7 +210,7 @@ SESSION_EVENTS_ROWS = [
         device_type="ios_app",
         country_code="CH",
     ),
-    # ORD-000004815 (CZK): no UTMs, so the channel falls back to the referrer
+    # ORD-000004815 (PLN): no UTMs, so the channel falls back to the referrer
     # duckduckgo.com (organic_search). Logs in at checkout.
     Row(
         event_date=date(2026, 10, 15),

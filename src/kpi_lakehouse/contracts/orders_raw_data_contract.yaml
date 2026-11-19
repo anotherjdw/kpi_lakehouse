@@ -1,72 +1,168 @@
-# Source contract orders_raw: data no job in this project writes. Describe the files exactly as
-# they are on disk. Generation-time input; never deployed.
-contract:
-  layer: raw                  # raw | preprocessed | processed
-  dataset: orders
-  file_format: json
-  partition_key: export_date
-  description: >
-    Order headers exported by the shop backend. A record is exported each time an order's status
-    changes, so one order_id appears once per status version, and later versions land in later
-    export_date partitions.
-  owner: Shop backend (order service)
-  classification:
-    contains_pii: false
-  freshness:
-    cadence: daily
-    max_lateness: 14 days (status changes until delivery)
-  grain:
-    unique_key: [order_id, updated_at]
-  schema:                     # include the partition column, typed date
-    - name: export_date
-      type: date
-      nullable: false
-      description: "Date the record was exported. Partition column; not the order date."
-    - name: order_id
-      type: string
-      nullable: false
-      description: "Natural key of the order."
-    - name: customer_id
-      type: string
-      nullable: false
-      description: "Foreign key to customers.customer_id."
-    - name: session_id
-      type: string
-      nullable: true
-      description: "Foreign key to session_events.session_id. Null for orders placed by customer service or without a tracked session."
-    - name: order_ts
-      type: timestamp
-      nullable: false
-      description: "Time the order was placed (UTC)."
-    - name: order_status
-      type: string
-      nullable: false
-      description: "Status of this version: placed | paid | shipped | delivered | cancelled."
-    - name: updated_at
-      type: timestamp
-      nullable: false
-      description: "Time this status version was written (UTC). The latest version per order_id is the current one."
-    - name: currency_code
-      type: string
-      nullable: false
-      description: "ISO 4217 currency the order was charged in: EUR | CHF | PLN | SEK | DKK."
-    - name: shipping_fee
-      type: decimal(12,2)
-      nullable: false
-      description: "Shipping fee charged, in currency_code, including VAT."
-    - name: voucher_code
-      type: string
-      nullable: true
-      description: "Voucher redeemed on the order. Its value is already allocated to order_items.discount_amount."
-    - name: payment_method
-      type: string
-      nullable: false
-      description: "card | paypal | klarna_invoice | bank_transfer."
-    - name: shipping_country
-      type: string
-      nullable: false
-      description: "ISO 3166-1 alpha-2 country the order ships to."
-    - name: is_test_order
-      type: boolean
-      nullable: false
-      description: "True for internal QA orders; excluded from every report."
+apiVersion: v3.2.0
+kind: DataContract
+id: orders_raw                     # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+team:
+  name: Shop backend (order service)
+customProperties:
+  - property: layer
+    value: raw                     # raw | preprocessed | processed
+  - property: fileFormat
+    value: json
+schema:
+  - name: orders_raw
+    physicalName: orders
+    logicalType: object
+    description: >
+      Order headers exported by the shop backend. A record is exported each time an order's status
+      changes, so one order_id appears once per status version, and later versions land in later
+      export_date partitions.
+    properties:
+      - name: export_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date the record was exported. Partition column; not the order date.
+        classification: internal
+        partitioned: true
+        examples: ["2026-11-02", "2026-12-05"]
+      - name: order_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Natural key of the order.
+        classification: internal
+        primaryKey: true
+        examples: [ORD-000418223, ORD-000502117]
+        logicalTypeOptions:
+          minLength: 13
+          maxLength: 13
+          pattern: "^ORD-[0-9]{9}$"
+      - name: customer_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: The customer who placed the order.
+        classification: personal
+        examples: [C0041877, C0003921]
+        relationships:
+          - to: customers_raw.customer_id
+        logicalTypeOptions:
+          minLength: 8
+          maxLength: 8
+          pattern: "^C[0-9]{7}$"
+      - name: session_id
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          The web session the order was placed in. Null for orders placed by customer service or
+          without a tracked session.
+        classification: personal
+        examples: [7c1e9a04b2d64f58a3e0c97b15d2f86a, e40b6d2fa91c4387b5d0a6e2c8f71b39]
+        relationships:
+          - to: session_events_raw.session_id
+        logicalTypeOptions:
+          minLength: 32
+          maxLength: 32
+          pattern: "^[0-9a-f]{32}$"
+      - name: order_ts
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: Time the order was placed (UTC).
+        classification: internal
+        examples: ["2026-11-02T09:41:17.204Z", "2026-10-14T21:03:55.918Z"]
+        logicalTypeOptions:
+          format: yyyy-MM-dd'T'HH:mm:ss.SSSXXX
+          timezone: true
+      - name: order_status
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Status of the order.
+        classification: internal
+        enum:
+          - value: placed
+          - value: paid
+          - value: shipped
+          - value: delivered
+          - value: cancelled
+        examples: [paid, delivered, cancelled]
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: >
+          Time this status version was written (UTC). The latest version per order_id is the
+          current one.
+        primaryKey: true
+        classification: internal
+        examples: ["2026-11-03T14:22:08.611Z", "2026-10-15T07:10:42.037Z"]
+        logicalTypeOptions:
+          format: yyyy-MM-dd'T'HH:mm:ss.SSSXXX
+          timezone: true
+      - name: currency_code
+        logicalType: string
+        physicalType: string
+        required: true
+        description: ISO 4217 currency the order was charged in.
+        classification: internal
+        enum:
+          - value: EUR
+          - value: DKK
+          - value: PLN
+          - value: CHF
+          - value: SEK
+        examples: [EUR, DKK, PLN]
+        logicalTypeOptions:
+          minLength: 3
+          maxLength: 3
+      - name: shipping_fee
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: Shipping fee charged, in currency_code, including VAT.
+        classification: internal
+        examples: ["4.90", "0.00", "29.00"]
+        logicalTypeOptions:
+          minimum: 0
+      - name: voucher_code
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          Voucher redeemed on the order. Its value is already allocated to
+          order_items.discount_amount.
+        classification: internal
+        examples: [AUTUMN10, WELCOME15]
+      - name: payment_method
+        logicalType: string
+        physicalType: string
+        required: true
+        description: How the order was paid.
+        classification: internal
+        enum:
+          - value: card
+          - value: paypal
+          - value: klarna_invoice
+          - value: bank_transfer
+        examples: [card, paypal]
+      - name: shipping_country
+        logicalType: string
+        physicalType: string
+        required: true
+        description: ISO 3166-1 alpha-2 country the order ships to.
+        classification: internal
+        examples: [DE, PL, SE]
+        logicalTypeOptions:
+          minLength: 2
+          maxLength: 2
+          pattern: "^[A-Z]{2}$"
+      - name: is_test_order
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        description: True for internal QA orders; excluded from every report.
+        classification: internal
+        examples: [true, false]

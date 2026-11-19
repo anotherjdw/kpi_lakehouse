@@ -87,16 +87,15 @@ ORDER_ITEMS_ROWS = [
         discount_amount=Decimal("2.70"),
         tax_rate=Decimal("0.0810"),
     ),
-    # ORD-000004815, CZK, CZ: CZ is not a simulator market; this assumes a price_factor of 25.00
-    # (29.99 EUR -> 749.00 CZK) and Czech VAT of 21%.
+    # ORD-000004815, PLN, PL: list price 29.99 EUR x 4.10, rounded to a whole price ending in 9.
     Row(
         order_date=date(2026, 10, 15),
         order_id="ORD-000004815",
         line_number=1,
         product_id="P00164",
         quantity=1,
-        unit_price=Decimal("749.00"),
+        unit_price=Decimal("119.00"),
         discount_amount=Decimal("0.00"),
-        tax_rate=Decimal("0.2100"),
+        tax_rate=Decimal("0.2300"),
     ),
 ]

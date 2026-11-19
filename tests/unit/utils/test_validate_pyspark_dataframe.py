@@ -1,19 +1,22 @@
-"""Write-time validation of an output DataFrame against its expected schema.
+"""Validation of a DataFrame against its contract's schema and the rules in its metadata.
 
-validate_pyspark_dataframe runs in each job's write(), before the file write. It checks
-exact column types (decimal precision/scale included, nullable ignored), then nulls in
-non-nullable columns, then uniqueness of the output's key.
+validate_pyspark_dataframe runs in each job's write(), before the file write, and in read()
+on a source with its own contract. It checks exact column types (decimal precision/scale
+included, nullable ignored), then, in one pass, nulls in non-nullable columns and the
+allowed values, bounds, lengths and patterns the fields' metadata sets, then uniqueness of
+the key, and reports every broken rule at once.
 """
 
 from datetime import date
 from decimal import Decimal
 
 import pytest
-from pyspark.sql import Row, SparkSession
+from pyspark.sql import DataFrame, Row, SparkSession
 from pyspark.sql.types import (
     DateType,
     DecimalType,
     IntegerType,
+    LongType,
     StringType,
     StructField,
     StructType,
@@ -131,3 +134,149 @@ def test_composite_key_is_checked_as_a_whole(spark: SparkSession) -> None:
     )
 
     validate_pyspark_dataframe(df, EXPECTED_SCHEMA, unique_key=UNIQUE_KEY)
+
+
+# One column per rule kind, each rule in the field's metadata as the contract writes it.
+RULES_SCHEMA = StructType(
+    [
+        StructField(
+            "code",
+            StringType(),
+            nullable=False,
+            metadata={
+                "primaryKey": True,
+                "minLength": 5,
+                "maxLength": 5,
+                "pattern": "^AB-[0-9]{2}$",
+            },
+        ),
+        StructField("status", StringType(), nullable=True, metadata={"enum": ["open", "done"]}),
+        StructField(
+            "amount",
+            DecimalType(10, 2),
+            nullable=True,
+            metadata={"minimum": "0", "maximum": "100.00"},
+        ),
+        StructField("quantity", LongType(), nullable=True, metadata={"exclusiveMaximum": "10"}),
+        StructField("day", DateType(), nullable=True, metadata={"exclusiveMinimum": "2026-01-01"}),
+    ]
+)
+
+RULES_NULLABLE_SCHEMA = StructType(
+    [StructField(field.name, field.dataType, nullable=True) for field in RULES_SCHEMA]
+)
+
+GOOD = {
+    "code": "AB-01",
+    "status": "open",
+    "amount": Decimal("100.00"),
+    "quantity": 9,
+    "day": date(2026, 1, 2),
+}
+
+
+def rules_df(spark: SparkSession, *changes: dict[str, object]) -> DataFrame:
+    """Build one row per entry of `changes`, each GOOD with that entry's values replaced."""
+    return spark.createDataFrame(
+        [Row(**{**GOOD, **change}) for change in changes], schema=RULES_NULLABLE_SCHEMA
+    )
+
+
+def test_rows_meeting_every_rule_pass(spark: SparkSession) -> None:
+    """Values on the inclusive bounds pass, and a null passes every rule but the null check."""
+    df = rules_df(
+        spark,
+        {},
+        {"code": "AB-02", "amount": Decimal("0.00")},
+        {"code": "AB-03", "status": None, "amount": None, "quantity": None, "day": None},
+    )
+
+    validate_pyspark_dataframe(df, RULES_SCHEMA)
+
+
+def test_value_outside_the_allowed_values_fails(spark: SparkSession) -> None:
+    """A value missing from the field's `enum` fails, counted per column."""
+    df = rules_df(spark, {"status": "lost"})
+
+    with pytest.raises(ValueError, match=r"values outside the allowed values \{'status': 1\}"):
+        validate_pyspark_dataframe(df, RULES_SCHEMA)
+
+
+def test_values_breaking_bounds_fail(spark: SparkSession) -> None:
+    """Each bound is compared in its column's type: decimal, whole number and date."""
+    df = rules_df(
+        spark,
+        {"code": "AB-01", "amount": Decimal("-0.01")},
+        {"code": "AB-02", "amount": Decimal("100.01"), "quantity": 10, "day": date(2026, 1, 1)},
+    )
+
+    with pytest.raises(ValueError) as raised:
+        validate_pyspark_dataframe(df, RULES_SCHEMA)
+
+    assert (
+        "values out of bounds {'amount (minimum 0)': 1, 'amount (maximum 100.00)': 1, "
+        "'quantity (exclusiveMaximum 10)': 1, 'day (exclusiveMinimum 2026-01-01)': 1}"
+    ) in str(raised.value)
+
+
+def test_strings_of_the_wrong_length_fail(spark: SparkSession) -> None:
+    """A string shorter than minLength or longer than maxLength fails."""
+    df = rules_df(spark, {"code": "AB-1"}, {"code": "AB-123"})
+
+    with pytest.raises(ValueError) as raised:
+        validate_pyspark_dataframe(df, RULES_SCHEMA)
+
+    assert "strings of the wrong length {'code (minLength 5)': 1, 'code (maxLength 5)': 1}" in str(
+        raised.value
+    )
+
+
+def test_string_not_matching_the_pattern_fails(spark: SparkSession) -> None:
+    """A string of the right length that doesn't match the pattern fails."""
+    df = rules_df(spark, {"code": "XY-01"})
+
+    with pytest.raises(ValueError, match=r"strings not matching the pattern \{'code': 1\}"):
+        validate_pyspark_dataframe(df, RULES_SCHEMA)
+
+
+def test_every_broken_rule_is_reported_at_once(spark: SparkSession) -> None:
+    """Nulls, rule violations and duplicate keys are all listed in one error."""
+    df = rules_df(spark, {"code": None}, {"status": "lost"}, {"status": "done"})
+
+    with pytest.raises(ValueError) as raised:
+        validate_pyspark_dataframe(df, RULES_SCHEMA)
+
+    message = str(raised.value)
+    assert message.startswith("Data validation failed: nulls in non-nullable columns {'code': 1}")
+    assert "values outside the allowed values {'status': 1}" in message
+    assert "1 duplicate row(s) detected across ['code']" in message
+
+
+def test_schema_problem_stops_before_the_data_checks(spark: SparkSession) -> None:
+    """A wrong type is reported alone: the value checks need the columns typed right."""
+    df = spark.createDataFrame(
+        [Row(date_utc=DAY, shop_id=None, earnings_eur="1.00")],
+        "date_utc date, shop_id int, earnings_eur string",
+    )
+
+    with pytest.raises(ValueError) as raised:
+        validate_pyspark_dataframe(df, EXPECTED_SCHEMA, unique_key=UNIQUE_KEY)
+
+    assert str(raised.value).startswith("Schema validation failed")
+    assert "nulls" not in str(raised.value)
+
+
+def test_primary_key_metadata_wins_over_unique_key(spark: SparkSession) -> None:
+    """The key marked in the metadata is checked, not the unique_key argument."""
+    df = rules_df(spark, {"status": "open"}, {"code": "AB-02", "status": "open"})
+
+    validate_pyspark_dataframe(df, RULES_SCHEMA, unique_key=["status"])
+
+
+def test_bound_on_a_string_column_raises(spark: SparkSession) -> None:
+    """A bound needs a number, date or timestamp column to compare against."""
+    schema = StructType([StructField("name", StringType(), metadata={"minimum": "a"})])
+    df = spark.createDataFrame([Row(name="b")], schema)
+
+    with pytest.raises(ValueError, match="A bound needs a number, date or timestamp column"):
+        validate_pyspark_dataframe(df, schema)

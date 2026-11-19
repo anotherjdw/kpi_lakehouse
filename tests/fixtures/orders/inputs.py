@@ -163,8 +163,8 @@ ORDERS_ROWS = [
         shipping_country="CH",
         is_test_order=False,
     ),
-    # CZK, placed then paid then cancelled before shipping. CZ is not a simulator market;
-    # its fee assumes a price_factor of 25.00 (4.95 EUR -> 123.75 CZK).
+    # PLN, PL, placed then paid then cancelled before shipping. Its fee uses PLN's
+    # price_factor of 4.10, as ORD-000004813 does (4.95 EUR -> 20.30 PLN).
     Row(
         export_date=date(2026, 10, 15),
         order_id="ORD-000004815",
@@ -173,11 +173,11 @@ ORDERS_ROWS = [
         order_ts=datetime(2026, 10, 15, 21, 5, 42, 610000),
         order_status="placed",
         updated_at=datetime(2026, 10, 15, 21, 5, 42, 610000),
-        currency_code="CZK",
-        shipping_fee=Decimal("123.75"),
+        currency_code="PLN",
+        shipping_fee=Decimal("20.30"),
         voucher_code=None,
         payment_method="card",
-        shipping_country="CZ",
+        shipping_country="PL",
         is_test_order=False,
     ),
     Row(
@@ -188,11 +188,11 @@ ORDERS_ROWS = [
         order_ts=datetime(2026, 10, 15, 21, 5, 42, 610000),
         order_status="paid",
         updated_at=datetime(2026, 10, 15, 21, 20, 18, 45000),
-        currency_code="CZK",
-        shipping_fee=Decimal("123.75"),
+        currency_code="PLN",
+        shipping_fee=Decimal("20.30"),
         voucher_code=None,
         payment_method="card",
-        shipping_country="CZ",
+        shipping_country="PL",
         is_test_order=False,
     ),
     Row(
@@ -203,11 +203,11 @@ ORDERS_ROWS = [
         order_ts=datetime(2026, 10, 15, 21, 5, 42, 610000),
         order_status="cancelled",
         updated_at=datetime(2026, 10, 16, 8, 41, 3, 220000),
-        currency_code="CZK",
-        shipping_fee=Decimal("123.75"),
+        currency_code="PLN",
+        shipping_fee=Decimal("20.30"),
         voucher_code=None,
         payment_method="card",
-        shipping_country="CZ",
+        shipping_country="PL",
         is_test_order=False,
     ),
     # EUR internal QA order, placed on Sunday: keep latest status drops it.
