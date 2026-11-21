@@ -1,63 +1,96 @@
-# Output contract of the dim_dates ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: preprocessed
-  dataset: dim_dates
-  description: Reference data source that contains key dimensions based on calendar date.
-  # table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [date]    # checked for duplicates on every write
-  schema: # include the partition column, typed date
-    - name: date
-      type: date
-      nullable: false
-      description: "Calender date."
-    - name: date_key
-      type: int
-      nullable: false
-      description: "Calender date in yyyymmdd format."
-    - name: year
-      type: int
-      nullable: false
-      description: "Year of the calendar date."
-    - name: quarter
-      type: int
-      nullable: false
-      description: "Quarter of the calendar date."
-      constraints:
-        min: 1
-        max: 4
-    - name: month
-      type: int
-      nullable: false
-      description: "Month of the calendar date."
-      constraints:
-        min: 1
-        max: 12
-    - name: iso_week
-      type: int
-      nullable: false
-      description: "ISO week of the calendar date."
-      constraints:
-        min: 1
-        max: 52
-    - name: weekday
-      type: int
-      nullable: false
-      description: "Weekday number of the calendar date, where 1 is Monday and 7 is Sunday."
-      constraints:
-        min: 1
-        max: 7
-    - name: is_weekend
-      type: boolean
-      nullable: false
-      description: "Boolean flag to indicate whether the calendar date falls on a weekend."
-    - name: month_start
-      type: date
-      nullable: false
-      description: "First day of the calendar month in YYYY-MM-DD format."
-    - name: month_end
-      type: date
-      nullable: false
-      description: "Last day of the calendar month in YYYY-MM-DD format."
+apiVersion: v3.2.0
+kind: DataContract
+id: dim_dates                      # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: preprocessed            # raw | preprocessed | processed
+schema:
+  - name: dim_dates
+    physicalName: dim_dates
+    logicalType: object
+    description: Reference data source that contains key dimensions based on calendar date.
+    properties:
+      - name: date
+        logicalType: date
+        physicalType: date
+        required: true
+        classification: internal
+        description: Calender date.
+        primaryKey: true
+        examples: [2026-11-02, 2026-10-14]
+      - name: date_key
+        logicalType: integer
+        physicalType: int
+        required: true
+        classification: internal
+        description: Calender date in yyyymmdd format.
+        examples: [20261102, 20261014]
+      - name: year
+        logicalType: integer
+        physicalType: int
+        required: true
+        classification: internal
+        description: Year of the calendar date.
+        examples: [2026, 2024]
+      - name: quarter
+        logicalType: integer
+        physicalType: int
+        required: true
+        classification: internal
+        description: Quarter of the calendar date.
+        logicalTypeOptions:
+          minimum: 1
+          maximum: 4
+        examples: [4, 3]
+      - name: month
+        logicalType: integer
+        physicalType: int
+        required: true
+        classification: internal
+        description: Month of the calendar date.
+        logicalTypeOptions:
+          minimum: 1
+          maximum: 12
+        examples: [11, 10]
+      - name: iso_week
+        logicalType: integer
+        physicalType: int
+        required: true
+        classification: internal
+        description: ISO week of the calendar date.
+        logicalTypeOptions:
+          minimum: 1
+          maximum: 53
+        examples: [7, 23]
+      - name: weekday
+        logicalType: integer
+        physicalType: int
+        required: true
+        classification: internal
+        description: Weekday number of the calendar date, where 1 is Monday and 7 is Sunday.
+        logicalTypeOptions:
+          minimum: 1
+          maximum: 7
+        examples: [1, 2]
+      - name: is_weekend
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        classification: internal
+        description: Boolean flag to indicate whether the calendar date falls on a weekend.
+        examples: [false, true]
+      - name: month_start
+        logicalType: date
+        physicalType: date
+        required: true
+        classification: internal
+        description: First day of the calendar month in YYYY-MM-DD format.
+        examples: [2026-11-01, 2026-10-01]
+      - name: month_end
+        logicalType: date
+        physicalType: date
+        required: true
+        classification: internal
+        description: Last day of the calendar month in YYYY-MM-DD format.
+        examples: [2026-11-30, 2026-10-31]

@@ -38,12 +38,16 @@ job:
         columns:
           - name: date
             type: date
+            required: true
           - name: mkt_channel
             type: string
+            required: false
           - name: sessions
             type: bigint
+            required: true
           - name: converted_sessions
             type: bigint
+            required: true
     - name: filter completed orders
       description: Keep the rows in fact_order_line whose order_status is not "cancelled".
       inputs: [fact_order_line]
@@ -59,10 +63,13 @@ job:
         columns:
           - name: date
             type: date
+            required: true
           - name: mkt_channel
             type: string
+            required: true
           - name: attributed_net_revenue_eur
             type: decimal(12,2)
+            required: true
     - name: aggregate marketing spend
       description: >
         Group by spend_date and mkt_channel, and aggregate as follows: spend_eur is the sum of spend_amount_eur. Rename spend_date as date.
@@ -72,10 +79,13 @@ job:
         columns:
           - name: date
             type: date
+            required: true
           - name: mkt_channel
             type: string
+            required: true
           - name: spend_eur
             type: decimal(12,2)
+            required: true
     - name: combine channel metrics
       description: Full outer join of all three aggregated datasets, on date and mkt_channel. Keep every date and mkt_channel that appears in any of them.
       inputs: [aggregate sessions, aggregate attributed revenue, aggregate marketing spend]
@@ -97,6 +107,7 @@ job:
         columns:
           - name: date_key
             type: int
+            required: true
     - name: create conversion rate
       description: Create a conversion rate column, where conversion_rate = converted_sessions/sessions; null when sessions is 0.
       inputs: [create date key]
@@ -106,6 +117,7 @@ job:
         columns:
           - name: conversion_rate
             type: decimal(5,4)
+            required: false
     - name: create return on ad spend
       description: create an roas column, where roas = attributed_net_revenue_eur / spend_eur; null when spend_eur is 0.
       inputs: [create conversion rate]
@@ -115,3 +127,4 @@ job:
         columns:
           - name: roas
             type: decimal(12,2)
+            required: false

@@ -1,55 +1,100 @@
-# Source contract order_items_raw: data no job in this project writes. Describe the files exactly
-# as they are on disk. Generation-time input; never deployed.
-contract:
-  layer: raw                  # raw | preprocessed | processed
-  dataset: order_items
-  file_format: json
-  partition_key: order_date
-  description: >
-    Order lines exported by the shop backend once, when the order is placed. Lines never change
-    afterwards; cancellations and returns are recorded on orders and returns.
-  owner: Shop backend (order service)
-  classification:
-    contains_pii: false
-  freshness:
-    cadence: daily
-    max_lateness: 1 day
-  grain:
-    unique_key: [order_id, line_number]
-  schema:                     # include the partition column, typed date
-    - name: order_date
-      type: date
-      nullable: false
-      description: "Date the order was placed (UTC). Partition column."
-    - name: order_id
-      type: string
-      nullable: false
-      description: "Foreign key to orders.order_id."
-    - name: line_number
-      type: int
-      nullable: false
-      description: "Position of the line within the order, starting at 1."
-      constraints:
-        min: 1
-    - name: product_id
-      type: string
-      nullable: false
-      description: "Foreign key to products.product_id."
-    - name: quantity
-      type: int
-      nullable: false
-      description: "Units ordered."
-      constraints:
-        min: 1
-    - name: unit_price
-      type: decimal(12,2)
-      nullable: false
-      description: "Price charged per unit, in the order's currency, including VAT, before discount."
-    - name: discount_amount
-      type: decimal(12,2)
-      nullable: false
-      description: "Total discount on the line, in the order's currency, including any voucher value allocated to it."
-    - name: tax_rate
-      type: decimal(5,4)
-      nullable: false
-      description: "VAT rate included in unit_price, e.g. 0.1900."
+apiVersion: v3.2.0
+kind: DataContract
+id: order_items_raw                # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+team:
+  name: Shop backend (order service)
+customProperties:
+  - property: layer
+    value: raw                     # raw | preprocessed | processed
+  - property: fileFormat
+    value: json
+schema:
+  - name: order_items_raw
+    physicalName: order_items
+    logicalType: object
+    description: >
+      Order lines exported by the shop backend once, when the order is placed. Lines never change
+      afterwards; cancellations and returns are recorded on orders and returns.
+    properties:
+      - name: order_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date the order was placed (UTC). Partition column.
+        classification: internal
+        partitioned: true
+        examples: [2026-11-02, 2026-10-14]
+      - name: order_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Foreign key to orders.order_id.
+        classification: internal
+        primaryKey: true
+        logicalTypeOptions:
+          pattern: "^ORD-[0-9]{9}$"
+        relationships:
+          - to: orders_raw.order_id
+        examples: [ ORD-000184233, ORD-000007712 ]
+      - name: line_number
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: Position of the line within the order, starting at 1.
+        classification: internal
+        primaryKey: true
+        logicalTypeOptions:
+          minimum: 1
+        examples: [ 1, 3 ]
+      - name: product_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Foreign key to products.product_id.
+        classification: internal
+        logicalTypeOptions:
+          pattern: "^P[0-9]{5}$"
+        relationships:
+          - to: products_raw.product_id
+        examples: [ P00412, P00093 ]
+      - name: quantity
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: Units ordered.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 1
+        examples: [1, 2, 4]
+      - name: unit_price
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: >
+          Price charged per unit, in the order's currency, including VAT, before discount.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 0
+        examples: [ "59.95", "349.00" ]
+      - name: discount_amount
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: >
+          Total discount on the line, in the order's currency, including any voucher value allocated
+          to it.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 0
+        examples: [ "0.00", "12.00" ]
+      - name: tax_rate
+        logicalType: number
+        physicalType: decimal(5,4)
+        required: true
+        description: VAT rate included in unit_price, e.g. 0.1900.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 0
+          maximum: 1
+        examples: [ "0.1900", "0.2500", "0.0810" ]

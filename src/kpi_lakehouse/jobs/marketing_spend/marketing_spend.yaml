@@ -50,3 +50,4 @@ job:
         columns:
           - name: spend_amount_eur
             type: decimal(12,2)
+            required: true

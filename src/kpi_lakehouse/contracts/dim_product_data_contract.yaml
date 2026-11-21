@@ -1,79 +1,153 @@
-# Output contract of the dim_product ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: processed
-  dataset: dim_product
-  description: Dimension table containing key information about the product catalog and the category hierarchy of products.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [ product_id, valid_from ]    # checked for duplicates on every write
-  schema: # include the partition column, typed date
-    - name: valid_from
-      type: date
-      nullable: false
-      description: "Snapshot date on which this version of the product's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one. Partition column"
-    - name: product_id
-      type: string
-      nullable: false
-      description: "Natural key of the product."
-    - name: sku
-      type: string
-      nullable: false
-      description: "Stock keeping unit printed on the label."
-    - name: product_name
-      type: string
-      nullable: false
-      description: "Display name in the shop."
-    - name: brand
-      type: string
-      nullable: false
-      description: "Brand name."
-    - name: category_id
-      type: string
-      nullable: false
-      description: "Foreign key to categories.category_id, always a leaf category."
-    - name: list_price_eur
-      type: decimal(12,2)
-      nullable: false
-      description: "Current list price in EUR including German VAT. Actual charged prices are on order_items."
-    - name: cost_price_eur
-      type: decimal(12,2)
-      nullable: false
-      description: "Purchase cost per unit in EUR excluding VAT, used for margin."
-    - name: is_active
-      type: boolean
-      nullable: false
-      description: "False once the product is delisted."
-    - name: launched_date
-      type: date
-      nullable: false
-      description: "Date the product was first listed."
-    - name: product_version_id
-      type: string
-      nullable: false
-      description: "SHA256 hashed ID of the concatenation of the product_id and valid_from fields."
-    - name: valid_to
-      type: date
-      nullable: true
-      description: "Date until which this version of the product record is valid."
-    - name: is_current
-      type: boolean
-      nullable: false
-      description: "Boolean flag indicating whether the selected version of the product data is current."
-    - name: category_id_level_1
-      type: string
-      nullable: false
-      description: "First level parent category of the category_id."
-    - name: category_id_level_2
-      type: string
-      nullable: true
-      description: "Second level parent category of the category_id."
-    - name: category_id_level_3
-      type: string
-      nullable: true
-      description: "Third level parent category of the category_id."
-    - name: category_id_level_4
-      type: string
-      nullable: true
-      description: "Fourth level parent category of the category_id."
+apiVersion: v3.2.0
+kind: DataContract
+id: dim_product                    # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: processed               # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: dim_product
+    physicalName: dim_product
+    logicalType: object
+    description: >
+      Dimension table containing key information about the product catalog and the category
+      hierarchy of products.
+    properties:
+      - name: valid_from
+        logicalType: date
+        physicalType: date
+        required: true
+        description: >
+          Snapshot date on which this version of the product's record was first observed. The
+          underlying change may have taken effect earlier, between the previous snapshot and this
+          one. Partition column.
+        classification: internal
+        primaryKey: true
+        examples: [2026-10-21, 2026-11-05]
+      - name: product_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Natural key of the product.
+        classification: internal
+        primaryKey: true
+        examples: [P00412, P00093]
+      - name: sku
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Stock keeping unit printed on the label.
+        classification: internal
+        examples: [SKU-SP-000412, SKU-HO-000093]
+      - name: product_name
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Display name in the shop.
+        classification: internal
+        examples: [Trail Runner 2, Linen Tea Towel Set, Arc Desk Lamp]
+      - name: brand
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Brand name.
+        classification: internal
+        examples: [Nordwind, Fjell & Sons]
+      - name: category_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Foreign key to categories.category_id, always a leaf category.
+        classification: internal
+        relationships:
+          - to: categories.category_id
+        examples: [ CAT-0031, CAT-0007 ]
+      - name: list_price_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: >
+          Current list price in EUR including German VAT. Actual charged prices are on order_items.
+        classification: internal
+        examples: ["89.95", "14.50"]
+      - name: cost_price_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: Purchase cost per unit in EUR excluding VAT, used for margin.
+        classification: internal
+        examples: ["31.20", "4.85"]
+      - name: is_active
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        description: False once the product is delisted.
+        classification: internal
+        examples: [false, true]
+      - name: launched_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date the product was first listed.
+        classification: internal
+        examples: [2025-03-17, 2026-08-01]
+      - name: product_version_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: SHA256 hashed ID of the concatenation of the product_id and valid_from fields.
+        classification: internal
+        examples: [a83f1c6e9d2b5f08c4e7a1d3b6f9c2e5a8d0b4f7c1e3a6d9b2f5c8e0a4d7b1f3, 0d6b9e2f5a8c1d4e7b0f3a6c9d2e5b8f1a4c7d0e3b6f9a2c5d8e1b4f7a0c3d6e]
+      - name: valid_to
+        logicalType: date
+        physicalType: date
+        required: false
+        description: Date until which this version of the product record is valid.
+        classification: internal
+        examples: [2026-11-04, 2026-10-20]
+      - name: is_current
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        description: >
+          Boolean flag indicating whether the selected version of the product data is current.
+        classification: internal
+        examples: [true, false]
+      - name: category_id_level_1
+        logicalType: string
+        physicalType: string
+        required: true
+        description: First level parent category of the category_id.
+        classification: internal
+        relationships:
+          - to: categories.category_id
+        examples: [ CAT-0001, CAT-0002 ]
+      - name: category_id_level_2
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Second level parent category of the category_id.
+        classification: internal
+        relationships:
+          - to: categories.category_id
+        examples: [ CAT-0004, CAT-0011 ]
+      - name: category_id_level_3
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Third level parent category of the category_id.
+        classification: internal
+        relationships:
+          - to: categories.category_id
+        examples: [ CAT-0019, CAT-0023 ]
+      - name: category_id_level_4
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Fourth level parent category of the category_id.
+        classification: internal
+        relationships:
+          - to: categories.category_id
+        examples: [ CAT-0031, CAT-0042 ]

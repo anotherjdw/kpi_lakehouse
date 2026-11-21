@@ -31,6 +31,7 @@ job:
         columns:            # columns this transformation adds; delete the block if none
           - name: is_version_start
             type: boolean
+            required: true
     - name: filter version starts
       description: filter the DataFrame to keep rows `is_version_start` is true, then drop the `is_version_start` column. Rows on the earliest snapshot_date in the DataFrame are only the comparison for the next day - drop them, unless the DataFrame contains a single snapshot_date.
       inputs: [ create tracked columns ]
@@ -47,7 +48,7 @@ job:
         columns:
           - name: valid_from
             type: date
-            nullable: false
+            required: true
     - name: create product version id
       description: Create an SHA256 hashed column called product_version_id, which takes a concatenation product_id and valid_from.
       inputs: [ add validity window ]
@@ -57,3 +58,4 @@ job:
         columns:
           - name: product_version_id
             type: string
+            required: true

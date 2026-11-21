@@ -34,7 +34,7 @@ job:
         columns:            # columns this transformation adds; delete the block if none
           - name: is_version_start
             type: boolean
-            nullable: false
+            required: true
     - name: filter version starts
       description: filter the DataFrame to keep rows `is_version_start` is true, then drop the `is_version_start` column. Rows on the earliest snapshot_date in the DataFrame are only the comparison for the next day - drop them, unless the DataFrame contains a single snapshot_date.
       inputs: [create tracked columns]
@@ -51,7 +51,7 @@ job:
         columns:
           - name: valid_from
             type: date
-            nullable: false
+            required: true
     - name: create customer version id
       description: Create an SHA256 hashed column called customer_version_id, which takes a concatenation customer_id and valid_from.
       inputs: [add validity window]
@@ -61,6 +61,7 @@ job:
         columns:
           - name: customer_version_id
             type: string
+            required: true
     - name: pseudonymise email data
       description: replace the values of the email column with an SHA256 hashed value of the email column.
       inputs: [create customer version id]
@@ -84,6 +85,7 @@ job:
         columns:
           - name: birth_year
             type: int
+            required: false
     - name: shorten postal code
       description: shorten the values of the postal_code column to the first two characters.
       inputs: [create birth year]

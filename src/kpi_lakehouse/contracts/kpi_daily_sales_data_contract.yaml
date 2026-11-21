@@ -1,59 +1,127 @@
-# Output contract of the kpi_daily_sales ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: processed
-  dataset: kpi_daily_sales
-  description: Daily KPI summary reporting order and revenue data.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [order_date]    # checked for duplicates on every write
-  schema:
-    - name: order_date
-      type: date
-      nullable: false
-      description: "Date the order was placed (UTC). Partition column."
-    - name: orders
-      type: int
-      nullable: false
-      description: "Daily amount of successfully processed orders."
-    - name: cancelled_orders
-      type: int
-      nullable: false
-      description: "Daily amount of cancelled orders."
-    - name: units
-      type: int
-      nullable: true
-      description: "Total amount of items contained within the successfully processed orders for a given day."
-    - name: gmv_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "The Gross Merchandising Value of the successfully processed orders for a given day."
-    - name: net_sales_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "Gross revenue of all successfully processed orders, excluding VAT, after discounts applied."
-    - name: net_revenue_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "Gross revenue of all successfully processed orders, excluding VAT, after discounts and refunds applied."
-    - name: gross_margin_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "Gross revneue of all successfully processed orders, excluding VAT, after discounts and item cost applied."
-    - name: date_key
-      type: int
-      nullable: false
-      description: "order_date as yyyyMMdd."
-    - name: aov_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "The average order value of successfully processed orders for a given day."
-    - name: gross_margin_pct
-      type: decimal(2,2)
-      nullable: true
-      description: "Ratio indicating the profitability of all orders successfully processed for a given day."
-    - name: cancellation_rate
-      type: decimal(2,2)
-      nullable: true
-      description: "Ratio of cancelled orders to all orders, indicating how frequently orders were cancelled on a given day."
+apiVersion: v3.2.0
+kind: DataContract
+id: kpi_daily_sales                # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: processed               # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: kpi_daily_sales
+    physicalName: kpi_daily_sales
+    logicalType: object
+    description: Daily KPI summary reporting order and revenue data.
+    properties:
+      - name: order_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date the order was placed (UTC). Partition column.
+        classification: internal
+        primaryKey: true
+        examples: [2026-11-02, 2026-10-14]
+      - name: orders
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: Daily amount of successfully processed orders.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 0
+        examples: [ 1843, 2210 ]
+      - name: cancelled_orders
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: Daily amount of cancelled orders.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 0
+        examples: [ 61, 0 ]
+      - name: units
+        logicalType: integer
+        physicalType: int
+        required: false
+        description: >
+          Total amount of items contained within the successfully processed orders for a given day.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 0
+        examples: [ 4127, 5390 ]
+      - name: gmv_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: >
+          The Gross Merchandising Value of the successfully processed orders for a given day.
+        classification: confidential
+        logicalTypeOptions:
+          minimum: 0
+        examples: [ "148230.55", "171904.10" ]
+      - name: net_sales_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: >
+          Gross revenue of all successfully processed orders, excluding VAT, after discounts
+          applied.
+        classification: confidential
+        logicalTypeOptions:
+          minimum: 0
+        examples: [ "112874.20", "130561.85" ]
+      - name: net_revenue_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: >
+          Gross revenue of all successfully processed orders, excluding VAT, after discounts and
+          refunds applied.
+        classification: confidential
+        examples: ["104390.75", "121008.40"]
+      - name: gross_margin_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: >
+          Gross revneue of all successfully processed orders, excluding VAT, after discounts and
+          item cost applied.
+        classification: confidential
+        examples: ["41755.30", "-1203.15"]
+      - name: date_key
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: order_date as yyyyMMdd.
+        classification: internal
+        relationships:
+          - to: dim_dates.date_key
+        examples: [ 20261102, 20261014 ]
+      - name: aov_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: The average order value of successfully processed orders for a given day.
+        classification: confidential
+        logicalTypeOptions:
+          minimum: 0
+        examples: [ "61.25", "58.90" ]
+      - name: gross_margin_pct
+        logicalType: number
+        physicalType: decimal(2,2)
+        required: false
+        description: >
+          Ratio indicating the profitability of all orders successfully processed for a given day.
+        classification: confidential
+        examples: ["0.37", "0.41"]
+      - name: cancellation_rate
+        logicalType: number
+        physicalType: decimal(2,2)
+        required: false
+        description: >
+          Ratio of cancelled orders to all orders, indicating how frequently orders were cancelled
+          on a given day.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 0
+        examples: [ "0.03", "0.00" ]

@@ -34,7 +34,7 @@ job:
         columns:            # columns this transformation adds; delete the block if none
           - name: update_date
             type: date
-            nullable: false
+            required: true
     - name: keep latest status
       description: First, keep the latest updated_at per return_id with a 45 day lookback. Then, keep return that are received or refunded, and filtered out requested and rejected returns.
       inputs: [create updated_date column]
@@ -58,6 +58,7 @@ job:
         columns:
           - name: refund_amount_eur
             type: decimal(12,2)
+            required: false
     - name: compute net refund
       description: Create a net_refund_eur column by dividing refund_amount_eur by (1 + tax_rate).
       inputs: [convert refund amount]
@@ -67,3 +68,4 @@ job:
         columns:
           - name: net_refund_eur
             type: decimal(12,2)
+            required: false

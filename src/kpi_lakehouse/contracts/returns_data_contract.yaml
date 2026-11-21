@@ -1,69 +1,138 @@
-# Output contract of the returns ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: preprocessed
-  dataset: returns
-  description: Event level records of returns of orders placed by customers.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [ return_id, updated_at ]
-  schema: # include the partition column, typed date
-    - name: update_date
-      type: date
-      nullable: false
-      description: "Date this status version was written (UTC). The latest version per return_id is the current one."
-    - name: export_date
-      type: date
-      nullable: false
-      description: "Date the record was exported. Partition column."
-    - name: return_id
-      type: string
-      nullable: false
-      description: "Natural key of the return."
-    - name: order_id
-      type: string
-      nullable: false
-      description: "Foreign key to orders.order_id."
-    - name: line_number
-      type: int
-      nullable: false
-      description: "With order_id, foreign key to order_items."
-    - name: product_id
-      type: string
-      nullable: false
-      description: "Foreign key to products.product_id; repeats the order line's product."
-    - name: requested_ts
-      type: timestamp
-      nullable: false
-      description: "Time the customer registered the return (UTC)."
-    - name: quantity_returned
-      type: int
-      nullable: false
-      description: "Units returned; at most the order line's quantity."
-      constraints:
-        min: 1
-    - name: return_reason
-      type: string
-      nullable: false
-      description: "wrong_size | damaged | not_as_described | changed_mind | other."
-    - name: return_status
-      type: string
-      nullable: false
-      description: "requested | received | refunded | rejected."
-    - name: updated_at
-      type: timestamp
-      nullable: false
-      description: "Time this status version was written (UTC). The latest version per return_id is the current one."
-    - name: tax_rate
-      type: decimal(5,4)
-      nullable: true
-      description: "VAT rate of the returned order line, e.g. 0.1900. Null when the order line isn't in the order_items rows read."
-    - name: refund_amount_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "Amount refunded in Euros, including VAT. Null until return_status is refunded."
-    - name: net_refund_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "Amount refunded in Euros, excluding VAT. Null until return_status is refunded."
+apiVersion: v3.2.0
+kind: DataContract
+id: returns                        # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: preprocessed            # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: returns
+    physicalName: returns
+    logicalType: object
+    description: Event level records of returns of orders placed by customers.
+    properties:
+      - name: update_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: >
+          Date this status version was written (UTC). The latest version per return_id is the
+          current one.
+        classification: internal
+        examples: [2026-11-06, 2026-10-29]
+      - name: export_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date the record was exported.
+        classification: internal
+        examples: [2026-11-06, 2026-10-29]
+      - name: return_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Natural key of the return.
+        classification: internal
+        primaryKey: true
+        examples: [RET-00004417, RET-00000958]
+      - name: order_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Foreign key to orders.order_id.
+        classification: internal
+        relationships:
+          - to: orders.order_id
+        examples: [ ORD-000184233, ORD-000007712 ]
+      - name: line_number
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: With order_id, foreign key to order_items.
+        classification: internal
+        examples: [1, 2]
+      - name: product_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Foreign key to products.product_id; repeats the order line's product.
+        classification: internal
+        relationships:
+          - to: products.product_id
+        examples: [ P00412, P00093 ]
+      - name: requested_ts
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: Time the customer registered the return (UTC).
+        classification: internal
+        examples: ["2026-11-05T16:42:30.118Z", "2026-10-27T09:03:12.640Z"]
+      - name: quantity_returned
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: Units returned; at most the order line's quantity.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 1
+        examples: [ 1, 2 ]
+      - name: return_reason
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Why the customer returned the line.
+        classification: internal
+        enum:
+          - value: wrong_size
+          - value: damaged
+          - value: not_as_described
+          - value: changed_mind
+          - value: other
+        examples: [ wrong_size, changed_mind ]
+      - name: return_status
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Status of this version of the return.
+        classification: internal
+        enum:
+          - value: requested
+          - value: received
+          - value: refunded
+          - value: rejected
+        examples: [ requested, refunded ]
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: >
+          Time this status version was written (UTC). The latest version per return_id is the
+          current one.
+        primaryKey: true
+        classification: internal
+        examples: ["2026-11-06T02:10:55.371Z", "2026-10-29T02:11:03.904Z"]
+      - name: tax_rate
+        logicalType: number
+        physicalType: decimal(5,4)
+        required: false
+        description: >
+          VAT rate of the returned order line, e.g. 0.1900. Null when the order line isn't in the
+          order_items rows read.
+        classification: internal
+        examples: ["0.1900", "0.2500"]
+      - name: refund_amount_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: Amount refunded in Euros, including VAT. Null until return_status is refunded.
+        classification: internal
+        examples: ["59.95", "120.00"]
+      - name: net_refund_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: Amount refunded in Euros, excluding VAT. Null until return_status is refunded.
+        classification: internal
+        examples: ["50.38", "96.00"]

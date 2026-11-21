@@ -38,3 +38,4 @@ job:
         columns:
           - name: mkt_channel
             type: string
+            required: false

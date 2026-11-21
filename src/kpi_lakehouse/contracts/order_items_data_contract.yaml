@@ -1,59 +1,109 @@
-# Output contract of the order_items ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: preprocessed
-  dataset: order_items
-  description: Items contained in orders placed by the customer.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [order_id, line_number]    # checked for duplicates on every write
-  schema: # include the partition column, typed date
-    - name: order_date
-      type: date
-      nullable: false
-      description: "Date the order was placed (UTC). Partition column."
-    - name: order_id
-      type: string
-      nullable: false
-      description: "Foreign key to orders.order_id."
-    - name: line_number
-      type: int
-      nullable: false
-      description: "Position of the line within the order, starting at 1."
-      constraints:
-        min: 1
-    - name: product_id
-      type: string
-      nullable: false
-      description: "Foreign key to products.product_id."
-    - name: quantity
-      type: int
-      nullable: false
-      description: "Units ordered."
-      constraints:
-        min: 1
-    - name: unit_price
-      type: decimal(12,2)
-      nullable: false
-      description: "Price charged per unit, in the order's currency, including VAT, before discount."
-    - name: discount_amount
-      type: decimal(12,2)
-      nullable: false
-      description: "Total discount on the line, in the order's currency, including any voucher value allocated to it."
-    - name: tax_rate
-      type: decimal(5,4)
-      nullable: false
-      description: "VAT rate included in unit_price, e.g. 0.1900."
-    - name: rate
-      type: decimal(18,8)
-      nullable: true
-      description: "Units of the order's currency per 1 EUR, as of order_date. An amount converts to EUR as amount / rate."
-    - name: gross_amount_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "Price charged for all units purchased in Euros, including VAT, after discount."
-    - name: net_amount_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "Price charged for all units purchased in Euros, excluding VAT, after discount."
+apiVersion: v3.2.0
+kind: DataContract
+id: order_items                    # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: preprocessed            # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: order_items
+    physicalName: order_items
+    logicalType: object
+    description: Items contained in orders placed by the customer.
+    properties:
+      - name: order_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date the order was placed (UTC). Partition column.
+        classification: internal
+        examples: [2026-11-02, 2026-12-12]
+      - name: order_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Foreign key to orders.order_id.
+        classification: internal
+        primaryKey: true
+        relationships:
+          - to: orders.order_id
+        examples: [ ORD-000184233, ORD-000007712 ]
+      - name: line_number
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: Position of the line within the order, starting at 1.
+        classification: internal
+        primaryKey: true
+        logicalTypeOptions:
+          minimum: 1
+        examples: [2, 4]
+      - name: product_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Foreign key to products.product_id.
+        classification: internal
+        relationships:
+          - to: products.product_id
+        logicalTypeOptions:
+          pattern: "^P[0-9]{5}$"
+        examples: [ P00412, P00093 ]
+      - name: quantity
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: Units ordered.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 1
+        examples: [1, 2, 4]
+      - name: unit_price
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: >
+          Price charged per unit, in the order's currency, including VAT, before discount.
+        classification: internal
+        examples: ["59.95", "349.00"]
+      - name: discount_amount
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: >
+          Total discount on the line, in the order's currency, including any voucher value allocated
+          to it.
+        classification: internal
+        examples: ["0.00", "12.00"]
+      - name: tax_rate
+        logicalType: number
+        physicalType: decimal(5,4)
+        required: true
+        description: VAT rate included in unit_price, e.g. 0.1900.
+        classification: internal
+        examples: ["0.1900", "0.2500", "0.0810"]
+      - name: rate
+        logicalType: number
+        physicalType: decimal(18,8)
+        required: false
+        description: >
+          Units of the order's currency per 1 EUR, as of order_date. An amount converts to EUR as
+          amount / rate.
+        classification: internal
+        examples: ["4.27310000", "1.00000000"]
+      - name: gross_amount_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: Price charged for all units purchased in Euros, including VAT, after discount.
+        classification: internal
+        examples: ["47.96", "349.00"]
+      - name: net_amount_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: Price charged for all units purchased in Euros, excluding VAT, after discount.
+        classification: internal
+        examples: ["40.30", "293.28"]

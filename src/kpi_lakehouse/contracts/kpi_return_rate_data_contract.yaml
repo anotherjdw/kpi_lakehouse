@@ -1,43 +1,83 @@
-# Output contract of the kpi_return_rate ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: processed
-  dataset: kpi_return_rate
-  description: One row per calendar month and level 1 category, with units sold, units returned, net refunds and return rate.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [month, category_id_level_1]    # checked for duplicates on every write
-  schema: # include the partition column, typed date
-    - name: month
-      type: date
-      nullable: false
-      description: "First day of the calendar month the orders were placed in (UTC). Partition column."
-    - name: category_id_level_1
-      type: string
-      nullable: true
-      description: "Level 1 category of the product version ordered. Null for order lines with no product version on order_date."
-    - name: units_sold
-      type: int
-      nullable: false
-      description: "Units ordered on the non-cancelled order lines placed in month."
-      constraints:
-        min: 0
-    - name: units_returned
-      type: int
-      nullable: false
-      description: "Units returned on those order lines, over their received and refunded returns. 0 when none."
-      constraints:
-        min: 0
-    - name: net_refunds_eur
-      type: decimal(12,2)
-      nullable: false
-      description: "Refunds on those order lines in Euros, excluding VAT, converted at the order-date rate. 0.00 when none."
-    - name: return_rate
-      type: decimal(5,4)
-      nullable: true
-      description: "units_returned / units_sold. Null when units_sold is 0."
-    - name: is_final
-      type: boolean
-      nullable: false
-      description: "True when the latest order_date read is more than 45 days after the last day of month, so no more returns are expected; otherwise false."
+apiVersion: v3.2.0
+kind: DataContract
+id: kpi_return_rate                # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: processed               # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: kpi_return_rate
+    physicalName: kpi_return_rate
+    logicalType: object
+    description: >
+      One row per calendar month and level 1 category, with units sold, units returned, net refunds
+      and return rate.
+    properties:
+      - name: month
+        logicalType: date
+        physicalType: date
+        required: true
+        description: >
+          First day of the calendar month the orders were placed in (UTC). Partition column.
+        classification: internal
+        primaryKey: true
+        examples: [2026-10-01, 2026-09-01]
+      - name: category_id_level_1
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          Level 1 category of the product version ordered. Null for order lines with no product
+          version on order_date.
+        primaryKey: true
+        classification: internal
+        relationships:
+          - to: categories.category_id
+        examples: [ CAT-0001, CAT-0002 ]
+      - name: units_sold
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: Units ordered on the non-cancelled order lines placed in month.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 0
+        examples: [ 4127, 0 ]
+      - name: units_returned
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: >
+          Units returned on those order lines, over their received and refunded returns. 0 when
+          none.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 0
+        examples: [ 388, 0 ]
+      - name: net_refunds_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: >
+          Refunds on those order lines in Euros, excluding VAT, converted at the order-date rate.
+          0.00 when none.
+        classification: confidential
+        examples: ["10432.18", "0.00"]
+      - name: return_rate
+        logicalType: number
+        physicalType: decimal(5,4)
+        required: false
+        description: units_returned / units_sold. Null when units_sold is 0.
+        classification: internal
+        examples: ["0.0940", "0.0000"]
+      - name: is_final
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        description: >
+          True when the latest order_date read is more than 45 days after the last day of month, so
+          no more returns are expected; otherwise false.
+        classification: internal
+        examples: [false, true]

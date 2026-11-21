@@ -44,6 +44,7 @@ job:
         columns:
           - name: gross_amount
             type: decimal(12,2)
+            required: true
     - name: create net amount
       description: create a net amount column by dividing gross amount by (1 + tax_rate).
       inputs: [create gross amount]
@@ -53,6 +54,7 @@ job:
         columns:
           - name: net_amount
             type: decimal(12, 2)
+            required: true
     - name: convert gross amount to euros
       description: create a gross_amount_eur by dividing gross_amount by rate.
       inputs: [create net amount]
@@ -63,6 +65,7 @@ job:
         columns:
           - name: gross_amount_eur
             type: decimal(12,2)
+            required: false
     - name: convert net amount to euros
       description: create a net_amount_eur by dividing net_amount by rate.
       inputs: [ convert gross amount to euros ]
@@ -73,3 +76,4 @@ job:
         columns:
           - name: net_amount_eur
             type: decimal(12,2)
+            required: false

@@ -48,6 +48,7 @@ job:
         columns:            # columns this transformation adds; delete the block if none
           - name: order_date
             type: date
+            required: true
         # removes_columns: [<column this transformation drops>]
     - name: keep latest status
       description: Keep the row with the latest `updated_at` per `order_id`. Read with a 14-day lookback so status changes exported days later replace earlier versions. Filter out test orders and drop is_test_order.
@@ -72,3 +73,4 @@ job:
         columns:
           - name: shipping_fee_eur
             type: decimal(12,2)
+            required: true

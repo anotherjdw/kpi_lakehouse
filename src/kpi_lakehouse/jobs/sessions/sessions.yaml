@@ -32,26 +32,26 @@ job:
         columns:            # columns this transformation adds; delete the block if none
           - name: session_id
             type: string
-            nullable: false
+            required: true
           - name: event_date
             type: date
-            nullable: false
+            required: true
           - name: first_event_time
             type: timestamp
-            nullable: false
+            required: true
           - name: last_event_time
             type: timestamp
-            nullable: true
+            required: false
           - name: first_mkt_channel
             type: string
-            nullable: true
+            required: false
           - name: customer_id
             type: string
-            nullable: false
+            required: false
           - name: last_event_type
             type: string
-            nullable: false
+            required: true
           - name: order_id
             type: string
-            nullable: true
+            required: false
         # removes_columns: [<column this transformation drops>]

@@ -40,6 +40,7 @@ job:
         columns:
           - name: date_key
             type: int
+            required: true
     - name: create converted customer flag
       description: Create a converted_customer column, where converted_customer is true when order_id is not null, otherwise false.
       inputs: [create date key]
@@ -49,6 +50,7 @@ job:
         columns:
           - name: converted_customer
             type: boolean
+            required: true
     - name: rename marketing channel
       description: Rename first_mkt_channel to mkt_channel
       inputs: [create converted customer flag]
@@ -59,3 +61,4 @@ job:
         columns:
           - name: mkt_channel
             type: string
+            required: false

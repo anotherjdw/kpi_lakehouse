@@ -29,10 +29,14 @@ job:
         columns:            # columns this transformation adds; delete the block if none
           - name: category_id_level_1
             type: string
+            required: true
           - name: category_id_level_2
             type: string
+            required: false
           - name: category_id_level_3
             type: string
+            required: false
           - name: category_id_level_4
             type: string
+            required: false
         # removes_columns: [<column this transformation drops>]

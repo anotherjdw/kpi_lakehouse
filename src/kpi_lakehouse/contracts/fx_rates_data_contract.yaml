@@ -1,27 +1,46 @@
-# Output contract of the fx_rates ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: preprocessed
-  dataset: fx_rates
-  description: Provides currency rates to enable conversion of fees and prices to Euros.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [rate_date, quote_currency]    # checked for duplicates on every write
-  schema: # include the partition column, typed date
-    - name: rate_date
-      type: date
-      nullable: false
-      description: "Date the rate was published. Partition column."
-    - name: base_currency
-      type: string
-      nullable: false
-      description: "Always EUR."
-    - name: quote_currency
-      type: string
-      nullable: false
-      description: "ISO 4217 currency quoted, e.g. CHF, PLN, SEK, DKK. EUR itself is not listed."
-    - name: rate
-      type: decimal(18,8)
-      nullable: false
-      description: "Units of quote_currency per 1 EUR. An amount converts to EUR as amount / rate."
+apiVersion: v3.2.0
+kind: DataContract
+id: fx_rates                       # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: preprocessed            # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: fx_rates
+    physicalName: fx_rates
+    logicalType: object
+    description: Provides currency rates to enable conversion of fees and prices to Euros.
+    properties:
+      - name: rate_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date the rate was published. Partition column.
+        primaryKey: true
+        classification: internal
+        examples: [2026-11-05, 2026-09-16]
+      - name: base_currency
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Always EUR.
+        classification: internal
+        enum:
+          - value: EUR
+      - name: quote_currency
+        logicalType: string
+        physicalType: string
+        required: true
+        description: ISO 4217 currency quoted, e.g. CHF, PLN, SEK, DKK. EUR itself is not listed.
+        classification: internal
+        primaryKey: true
+        examples: [PLN, SEK, CHF]
+      - name: rate
+        logicalType: number
+        physicalType: decimal(18,8)
+        required: true
+        description: Units of quote_currency per 1 EUR. An amount converts to EUR as amount / rate.
+        classification: internal
+        examples: ["4.27310000", "11.52840000", "0.94170000"]

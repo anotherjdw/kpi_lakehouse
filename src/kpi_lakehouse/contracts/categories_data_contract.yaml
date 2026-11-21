@@ -1,47 +1,97 @@
-# Output contract of the categories ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: preprocessed
-  dataset: category
-  description: Internal flattened catalog of product categories.
-  # table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [category_id]
-  schema:
-    - name: category_id
-      type: string
-      nullable: false
-      description: "Natural key of the category."
-    - name: category_name
-      type: string
-      nullable: false
-      description: "Display name, e.g. Running Shoes."
-    - name: parent_category_id
-      type: string
-      nullable: true
-      description: "category_id of the parent. Null for a root category."
-    - name: is_active
-      type: boolean
-      nullable: false
-      description: "False once the category is retired; retired categories stay for history."
-    - name: updated_at
-      type: timestamp
-      nullable: false
-      description: "Time the category was last changed (UTC)."
-    - name: category_id_level_1
-      type: string
-      nullable: false
-      description: "First level parent category of the category_id."
-    - name: category_id_level_2
-      type: string
-      nullable: true
-      description: "Second level parent category of the category_id."
-    - name: category_id_level_3
-      type: string
-      nullable: true
-      description: "Third level parent category of the category_id."
-    - name: category_id_level_4
-      type: string
-      nullable: true
-      description: "Fourth level parent category of the category_id."
+apiVersion: v3.2.0
+kind: DataContract
+id: categories                     # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: preprocessed            # raw | preprocessed | processed
+schema:
+  - name: categories
+    physicalName: category
+    logicalType: object
+    description: Internal flattened catalog of product categories.
+    properties:
+      - name: category_id
+        logicalType: string
+        physicalType: string
+        required: true
+        classification: internal
+        description: Natural key of the category.
+        primaryKey: true
+        logicalTypeOptions:
+          pattern: "^CAT-[0-9]{4}$"
+        examples: [CAT-0007, CAT-0031]
+      - name: category_name
+        logicalType: string
+        physicalType: string
+        required: true
+        classification: internal
+        description: Display name, e.g. Running Shoes.
+        examples: [Running Shoes, Kitchen Textiles, Desk Lamps]
+      - name: parent_category_id
+        logicalType: string
+        physicalType: string
+        required: false
+        classification: internal
+        description: category_id of the parent. Null for a root category.
+        relationships:
+          - to: categories.category_id
+        logicalTypeOptions:
+          pattern: "^CAT-[0-9]{4}$"
+        examples: [ CAT-0002, CAT-0019 ]
+      - name: is_active
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        classification: internal
+        description: False once the category is retired; retired categories stay for history.
+        examples: [true, false]
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        classification: internal
+        description: Time the category was last changed (UTC).
+        examples: ["2026-09-30T11:14:52.380Z", "2026-11-04T06:48:09.725Z"]
+      - name: category_id_level_1
+        logicalType: string
+        physicalType: string
+        required: true
+        classification: internal
+        description: First level parent category of the category_id.
+        relationships:
+          - to: categories.category_id
+        examples: [ CAT-0001, CAT-0002 ]
+      - name: category_id_level_2
+        logicalType: string
+        physicalType: string
+        required: false
+        classification: internal
+        description: Second level parent category of the category_id.
+        relationships:
+          - to: categories.category_id
+        logicalTypeOptions:
+          pattern: "^CAT-[0-9]{4}$"
+        examples: [ CAT-0019, CAT-0023 ]
+      - name: category_id_level_3
+        logicalType: string
+        physicalType: string
+        required: false
+        classification: internal
+        description: Third level parent category of the category_id.
+        relationships:
+          - to: categories.category_id
+        logicalTypeOptions:
+          pattern: "^CAT-[0-9]{4}$"
+        examples: [ CAT-0019, CAT-0023 ]
+      - name: category_id_level_4
+        logicalType: string
+        physicalType: string
+        required: false
+        classification: internal
+        description: Fourth level parent category of the category_id.
+        relationships:
+          - to: categories.category_id
+        logicalTypeOptions:
+          pattern: "^CAT-[0-9]{4}$"
+        examples: [ CAT-0031, CAT-0042 ]
