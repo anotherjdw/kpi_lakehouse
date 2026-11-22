@@ -1,8 +1,9 @@
 """Read, validate and write the PySpark DataFrames every job in this project handles."""
 
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import pyspark.sql.functions as f
 import pyspark.sql.types as t
@@ -90,6 +91,9 @@ def null_violations(schema: StructType) -> dict[str, Column]:
 def enum_violations(schema: StructType) -> dict[str, Column]:
     """Count the values outside the allowed values of each column whose metadata sets `enum`.
 
+    The allowed values of a decimal, date or timestamp column are written as text, since
+    metadata is JSON, and are compared as values of the column's type.
+
     Args:
         schema: The contract's schema.
 
@@ -97,10 +101,26 @@ def enum_violations(schema: StructType) -> dict[str, Column]:
         One count per such column, keyed by column name, as Spark expressions not yet run.
     """
     return {
-        field.name: _count(~f.col(field.name).isin(field.metadata["enum"]))
+        field.name: _count(~f.col(field.name).isin(_allowed_values(field)))
         for field in schema.fields
         if "enum" in field.metadata
     }
+
+
+def _allowed_values(field: t.StructField) -> list[object]:
+    """Read a column's `enum` as values of the column's type.
+
+    Args:
+        field: A field whose metadata sets `enum`.
+
+    Returns:
+        The allowed values: decimals, dates and timestamps turned from their text, every
+        other value as written.
+    """
+    if isinstance(field.dataType, t.DecimalType | t.DateType | t.TimestampType):
+        return [_typed_value(text, field) for text in field.metadata["enum"]]
+    values: list[object] = field.metadata["enum"]
+    return values
 
 
 # What breaks each bound: the value compared with the bound.
@@ -112,21 +132,26 @@ _BOUND_BREAKS: dict[str, Callable[[Column, Column], Column]] = {
 }
 
 
-def _bound_value(text: str, data_type: t.DataType) -> Decimal | int | float | date | datetime:
-    """Turn a bound written as text into a value of its column's type.
+def _typed_value(text: str, field: t.StructField) -> Decimal | int | float | date | datetime:
+    """Turn a bound, or an allowed value, written as text into a value of its column's type.
 
-    Every bound is written as text in the metadata, so a decimal bound stays exact.
+    Every bound is written as text in the metadata, and so is every allowed value of a
+    decimal, date or timestamp column, so a decimal stays exact. A timestamp written
+    without an offset is read in the column's `defaultTimezone`, or in UTC when it sets
+    none, so it means the same instant wherever the job runs: Spark would otherwise read
+    it in the time zone of the machine running the job.
 
     Args:
-        text: The bound as written, e.g. "0" or "2020-01-01".
-        data_type: The column's type.
+        text: The value as written, e.g. "0", "2020-01-01" or "2026-01-01T00:00:00".
+        field: The column, whose type the value takes.
 
     Returns:
-        The bound as a decimal, whole number, float, date or timestamp.
+        The value as a decimal, whole number, float, date or timestamp with a time zone.
 
     Raises:
         ValueError: If the column is not a number, date or timestamp.
     """
+    data_type = field.dataType
     if isinstance(data_type, t.DecimalType):
         return Decimal(text)
     if isinstance(data_type, t.IntegralType):
@@ -134,7 +159,11 @@ def _bound_value(text: str, data_type: t.DataType) -> Decimal | int | float | da
     if isinstance(data_type, t.FractionalType):
         return float(text)
     if isinstance(data_type, t.TimestampType):
-        return datetime.fromisoformat(text)
+        value = datetime.fromisoformat(text)
+        if value.tzinfo is not None:
+            return value
+        zone = field.metadata.get("defaultTimezone")
+        return value.replace(tzinfo=ZoneInfo(zone) if zone else UTC)
     if isinstance(data_type, t.DateType):
         return date.fromisoformat(text)
     raise ValueError(
@@ -159,7 +188,7 @@ def bound_violations(schema: StructType) -> dict[str, Column]:
     for field in schema.fields:
         for rule, breaks in _BOUND_BREAKS.items():
             if rule in field.metadata:
-                bound = f.lit(_bound_value(field.metadata[rule], field.dataType))
+                bound = f.lit(_typed_value(field.metadata[rule], field))
                 key = f"{field.name} ({rule} {field.metadata[rule]})"
                 counts[key] = _count(breaks(f.col(field.name), bound))
     return counts
@@ -219,9 +248,7 @@ def primary_key(schema: StructType) -> list[str]:
     return [field.name for field in schema.fields if field.metadata.get("primaryKey")]
 
 
-def validate_pyspark_dataframe(
-    data: DataFrame, expected_schema: t.StructType, unique_key: list[str] | None = None
-) -> None:
+def validate_pyspark_dataframe(data: DataFrame, expected_schema: t.StructType) -> None:
     """Check a DataFrame against its contract, reporting every problem found.
 
     Runs in each job's write() on the output, and in read() on a source with its own
@@ -230,14 +257,12 @@ def validate_pyspark_dataframe(
     shared column. If any of these fail, it raises without reading the data, since the
     other checks need the columns to be there and typed right. Then the data: nulls in
     non-nullable columns, allowed values, bounds, string lengths and patterns, counted
-    together in one pass, and duplicate keys. An empty DataFrame passes.
+    together in one pass, and duplicates over the columns the metadata marks
+    `primaryKey`, or over whole rows when it marks none. An empty DataFrame passes.
 
     Args:
         data: The DataFrame to check.
         expected_schema: The contract's schema; the rules are in its fields' metadata.
-        unique_key: The key columns, for a schema whose metadata marks no `primaryKey`.
-            The metadata wins when it marks one. With neither, the duplicate check
-            covers whole rows.
 
     Raises:
         ValueError: "Schema validation failed: ..." listing every schema problem, or
@@ -278,7 +303,7 @@ def validate_pyspark_dataframe(
                 found.setdefault(problem, {})[name] = totals[i]
         data_problems = [f"{problem} {counts}" for problem, counts in found.items()]
 
-    uniqueness = check_no_duplicate_rows(data, subset=primary_key(expected_schema) or unique_key)
+    uniqueness = check_no_duplicate_rows(data, subset=primary_key(expected_schema) or None)
     if not uniqueness.passed:
         data_problems.append(uniqueness.message)
     if data_problems:

@@ -59,21 +59,55 @@ def filter_completed_orders(fact_order_line: DataFrame) -> DataFrame:
 
 
 def aggregate_marketing_spend(marketing_spend: DataFrame) -> DataFrame:
-    """Aggregate marketing spend by date and channel.
+    """Aggregate marketing spend by date and marketing channel.
 
-    Groups the marketing spend data by spend_date and platform (used as
-    mkt_channel), summing spend_amount_eur into spend_eur.
+    Classifies each spend row into mkt_channel from its utm_source and utm_medium with
+    the rules session_events' derive_marketing_channel applies to events, so spend and
+    sessions share one channel key; a row without a utm_source is direct, as an event
+    with no UTMs and no referrer is. Then groups by spend_date and mkt_channel, summing
+    spend_amount_eur into spend_eur.
 
     Args:
-        marketing_spend: DataFrame containing raw marketing spend records with
-            spend_date, platform, and spend_amount_eur columns among others.
+        marketing_spend: DataFrame containing marketing spend records with spend_date,
+            utm_source, utm_medium and spend_amount_eur columns among others.
 
     Returns:
         DataFrame with columns date (date), mkt_channel (string), and
         spend_eur (decimal(12,2)), aggregated by date and marketing channel.
     """
+    paid_search_sources = ["google", "bing", "yahoo", "baidu", "duckduckgo", "yandex"]
+    paid_social_sources = [
+        "facebook",
+        "instagram",
+        "twitter",
+        "linkedin",
+        "tiktok",
+        "pinterest",
+        "snapchat",
+        "youtube",
+    ]
+    affiliate_mediums = ["affiliate", "partner", "cpa"]
+    email_mediums = ["email", "newsletter", "e-mail", "mail"]
+    paid_mediums = ["cpc", "ppc", "paid", "paid_search", "paidsearch", "paid search"]
+    social_mediums = ["social", "social-media", "social_media", "paid_social", "paidsocial"]
+    src = F.lower(F.col("utm_source"))
+    med = F.lower(F.col("utm_medium"))
+    has_utm = F.col("utm_source").isNotNull() & (F.trim(F.col("utm_source")) != "")
+    utm_channel = (
+        F.when(med.isin(email_mediums), "email")
+        .when(med.isin(affiliate_mediums), "affiliate")
+        .when(med.isin(paid_mediums) & src.isin(paid_search_sources), "paid_search")
+        .when(
+            med.isin(paid_mediums) | med.isin(social_mediums),
+            F.when(src.isin(paid_social_sources), "paid_social").otherwise("paid_search"),
+        )
+        .when(src.isin(paid_social_sources) & med.isin(social_mediums), "paid_social")
+        .when(src.isin(paid_search_sources), "paid_search")
+        .when(src.isin(paid_social_sources), "paid_social")
+        .otherwise("referral")
+    )
     return (
-        marketing_spend.withColumnRenamed("platform", "mkt_channel")
+        marketing_spend.withColumn("mkt_channel", F.when(has_utm, utm_channel).otherwise("direct"))
         .groupBy(F.col("spend_date"), F.col("mkt_channel"))
         .agg(F.sum("spend_amount_eur").cast("decimal(12,2)").alias("spend_eur"))
         .withColumnRenamed("spend_date", "date")
@@ -335,11 +369,7 @@ def write(output: DataFrame, output_file_path: str, output_table: str) -> None:
     """Check the output against its contract, write it as parquet, then register its partitions."""
     output = output.persist()
     try:
-        validate_pyspark_dataframe(
-            output,
-            schema_definitions.kpi_channel_performance_schema,
-            unique_key=["date", "mkt_channel"],
-        )
+        validate_pyspark_dataframe(output, schema_definitions.kpi_channel_performance_schema)
         write_pyspark_dataframe(
             output_dataframe=output,
             output_file_path=output_file_path,

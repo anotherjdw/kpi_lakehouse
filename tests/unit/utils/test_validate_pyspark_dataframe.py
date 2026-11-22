@@ -7,7 +7,7 @@ allowed values, bounds, lengths and patterns the fields' metadata sets, then uni
 the key, and reports every broken rule at once.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -20,14 +20,16 @@ from pyspark.sql.types import (
     StringType,
     StructField,
     StructType,
+    TimestampType,
 )
 
 from kpi_lakehouse.utils.dataframes import validate_pyspark_dataframe
 
+# The key is (date_utc, shop_id), marked in the metadata as the StructType module writes it.
 EXPECTED_SCHEMA = StructType(
     [
-        StructField("date_utc", DateType(), nullable=False),
-        StructField("shop_id", IntegerType(), nullable=False),
+        StructField("date_utc", DateType(), nullable=False, metadata={"primaryKey": True}),
+        StructField("shop_id", IntegerType(), nullable=False, metadata={"primaryKey": True}),
         StructField("earnings_eur", DecimalType(10, 2), nullable=True),
     ]
 )
@@ -36,8 +38,6 @@ EXPECTED_SCHEMA = StructType(
 NULLABLE_SCHEMA = StructType(
     [StructField(field.name, field.dataType, nullable=True) for field in EXPECTED_SCHEMA]
 )
-
-UNIQUE_KEY = ["date_utc", "shop_id"]
 
 DAY = date(2026, 1, 1)
 
@@ -52,14 +52,14 @@ def test_valid_dataframe_passes(spark: SparkSession) -> None:
         schema=NULLABLE_SCHEMA,
     )
 
-    validate_pyspark_dataframe(df, EXPECTED_SCHEMA, unique_key=UNIQUE_KEY)
+    validate_pyspark_dataframe(df, EXPECTED_SCHEMA)
 
 
 def test_empty_dataframe_passes(spark: SparkSession) -> None:
     """An empty DataFrame has no nulls and no duplicates, so it passes."""
     df = spark.createDataFrame([], schema=NULLABLE_SCHEMA)
 
-    validate_pyspark_dataframe(df, EXPECTED_SCHEMA, unique_key=UNIQUE_KEY)
+    validate_pyspark_dataframe(df, EXPECTED_SCHEMA)
 
 
 def test_decimal_precision_mismatch_fails(spark: SparkSession) -> None:
@@ -74,7 +74,7 @@ def test_decimal_precision_mismatch_fails(spark: SparkSession) -> None:
     df = spark.createDataFrame([Row(date_utc=DAY, shop_id=1, earnings_eur=Decimal("1.00"))], schema)
 
     with pytest.raises(ValueError, match=r"Expected decimal\(10,2\), Received decimal\(20,2\)"):
-        validate_pyspark_dataframe(df, EXPECTED_SCHEMA, unique_key=UNIQUE_KEY)
+        validate_pyspark_dataframe(df, EXPECTED_SCHEMA)
 
 
 def test_missing_column_fails(spark: SparkSession) -> None:
@@ -84,7 +84,7 @@ def test_missing_column_fails(spark: SparkSession) -> None:
     with pytest.raises(
         ValueError, match="(?s)Schema validation failed.*Missing columns.*earnings_eur"
     ):
-        validate_pyspark_dataframe(df, EXPECTED_SCHEMA, unique_key=UNIQUE_KEY)
+        validate_pyspark_dataframe(df, EXPECTED_SCHEMA)
 
 
 def test_unexpected_column_fails(spark: SparkSession) -> None:
@@ -95,7 +95,7 @@ def test_unexpected_column_fails(spark: SparkSession) -> None:
     )
 
     with pytest.raises(ValueError, match="(?s)Schema validation failed.*Unexpected columns.*extra"):
-        validate_pyspark_dataframe(df, EXPECTED_SCHEMA, unique_key=UNIQUE_KEY)
+        validate_pyspark_dataframe(df, EXPECTED_SCHEMA)
 
 
 def test_null_in_non_nullable_column_fails(spark: SparkSession) -> None:
@@ -105,7 +105,7 @@ def test_null_in_non_nullable_column_fails(spark: SparkSession) -> None:
     )
 
     with pytest.raises(ValueError, match="Data validation failed: nulls.*shop_id"):
-        validate_pyspark_dataframe(df, EXPECTED_SCHEMA, unique_key=UNIQUE_KEY)
+        validate_pyspark_dataframe(df, EXPECTED_SCHEMA)
 
 
 def test_duplicate_key_fails(spark: SparkSession) -> None:
@@ -119,7 +119,7 @@ def test_duplicate_key_fails(spark: SparkSession) -> None:
     )
 
     with pytest.raises(ValueError, match="Data validation failed: 1 duplicate row"):
-        validate_pyspark_dataframe(df, EXPECTED_SCHEMA, unique_key=UNIQUE_KEY)
+        validate_pyspark_dataframe(df, EXPECTED_SCHEMA)
 
 
 def test_composite_key_is_checked_as_a_whole(spark: SparkSession) -> None:
@@ -133,7 +133,7 @@ def test_composite_key_is_checked_as_a_whole(spark: SparkSession) -> None:
         schema=NULLABLE_SCHEMA,
     )
 
-    validate_pyspark_dataframe(df, EXPECTED_SCHEMA, unique_key=UNIQUE_KEY)
+    validate_pyspark_dataframe(df, EXPECTED_SCHEMA)
 
 
 # One column per rule kind, each rule in the field's metadata as the contract writes it.
@@ -231,6 +231,63 @@ def test_strings_of_the_wrong_length_fail(spark: SparkSession) -> None:
     )
 
 
+def test_allowed_values_written_as_text_are_compared_in_their_column_type(
+    spark: SparkSession,
+) -> None:
+    """A decimal or date column's allowed values are text in the metadata, read as its type."""
+    schema = StructType(
+        [
+            StructField("fee", DecimalType(10, 2), metadata={"enum": ["0.00", "4.50"]}),
+            StructField("day", DateType(), metadata={"enum": ["2026-01-01"]}),
+        ]
+    )
+    df = spark.createDataFrame(
+        [
+            Row(fee=Decimal("4.50"), day=date(2026, 1, 1)),
+            Row(fee=Decimal("4.51"), day=date(2026, 1, 2)),
+        ],
+        schema,
+    )
+
+    with pytest.raises(
+        ValueError, match=r"values outside the allowed values \{'fee': 1, 'day': 1\}"
+    ):
+        validate_pyspark_dataframe(df, schema)
+
+
+def test_timestamp_rules_without_an_offset_are_read_in_the_column_zone(
+    spark: SparkSession,
+) -> None:
+    """Without an offset, a bound or allowed value is in defaultTimezone, else in UTC.
+
+    Each column allows exactly the instant 2026-01-01T00:00:00Z, so the check gives the
+    same result wherever it runs.
+    """
+    schema = StructType(
+        [
+            StructField(
+                "local_ts",
+                TimestampType(),
+                metadata={"minimum": "2026-01-01T01:00:00", "defaultTimezone": "Europe/Warsaw"},
+            ),
+            StructField("utc_ts", TimestampType(), metadata={"enum": ["2026-01-01T00:00:00"]}),
+        ]
+    )
+    instant = datetime(2026, 1, 1, tzinfo=UTC)
+    before = datetime(2025, 12, 31, 23, 59, 59, tzinfo=UTC)
+    validate_pyspark_dataframe(
+        spark.createDataFrame([Row(local_ts=instant, utc_ts=instant)], schema), schema
+    )
+
+    with pytest.raises(ValueError) as raised:
+        validate_pyspark_dataframe(
+            spark.createDataFrame([Row(local_ts=before, utc_ts=before)], schema), schema
+        )
+
+    assert "values outside the allowed values {'utc_ts': 1}" in str(raised.value)
+    assert "values out of bounds {'local_ts (minimum 2026-01-01T01:00:00)': 1}" in str(raised.value)
+
+
 def test_string_not_matching_the_pattern_fails(spark: SparkSession) -> None:
     """A string of the right length that doesn't match the pattern fails."""
     df = rules_df(spark, {"code": "XY-01"})
@@ -260,17 +317,23 @@ def test_schema_problem_stops_before_the_data_checks(spark: SparkSession) -> Non
     )
 
     with pytest.raises(ValueError) as raised:
-        validate_pyspark_dataframe(df, EXPECTED_SCHEMA, unique_key=UNIQUE_KEY)
+        validate_pyspark_dataframe(df, EXPECTED_SCHEMA)
 
     assert str(raised.value).startswith("Schema validation failed")
     assert "nulls" not in str(raised.value)
 
 
-def test_primary_key_metadata_wins_over_unique_key(spark: SparkSession) -> None:
-    """The key marked in the metadata is checked, not the unique_key argument."""
-    df = rules_df(spark, {"status": "open"}, {"code": "AB-02", "status": "open"})
+def test_schema_without_a_key_is_checked_for_duplicate_rows(spark: SparkSession) -> None:
+    """With no primaryKey column, two identical rows fail, and rows that differ pass."""
+    schema = StructType([StructField("name", StringType()), StructField("size", IntegerType())])
+    validate_pyspark_dataframe(
+        spark.createDataFrame([Row(name="a", size=1), Row(name="a", size=2)], schema), schema
+    )
 
-    validate_pyspark_dataframe(df, RULES_SCHEMA, unique_key=["status"])
+    with pytest.raises(ValueError, match="1 duplicate row"):
+        validate_pyspark_dataframe(
+            spark.createDataFrame([Row(name="a", size=1), Row(name="a", size=1)], schema), schema
+        )
 
 
 def test_bound_on_a_string_column_raises(spark: SparkSession) -> None:
