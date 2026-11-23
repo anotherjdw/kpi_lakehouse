@@ -8,7 +8,7 @@ customProperties:
   - property: layer
     value: raw                     # raw | preprocessed | processed
   - property: fileFormat
-    value: json
+    value: jsonl
 schema:
   - name: returns_raw
     physicalName: returns

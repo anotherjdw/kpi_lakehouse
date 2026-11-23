@@ -248,11 +248,15 @@ def primary_key(schema: StructType) -> list[str]:
     return [field.name for field in schema.fields if field.metadata.get("primaryKey")]
 
 
-def validate_pyspark_dataframe(data: DataFrame, expected_schema: t.StructType) -> None:
+def validate_pyspark_dataframe(
+    data: DataFrame, expected_schema: t.StructType, check_duplicates: bool = True
+) -> None:
     """Check a DataFrame against its contract, reporting every problem found.
 
     Runs in each job's write() on the output, and in read() on a source with its own
     contract, so a job neither reads nor writes data its contract does not describe.
+    read() leaves out the duplicate check: a botched ingestion can repeat files or rows,
+    and the job's own transformations can remove them.
     First the schema: missing and unexpected columns, and the exact type of every
     shared column. If any of these fail, it raises without reading the data, since the
     other checks need the columns to be there and typed right. Then the data: nulls in
@@ -263,6 +267,7 @@ def validate_pyspark_dataframe(data: DataFrame, expected_schema: t.StructType) -
     Args:
         data: The DataFrame to check.
         expected_schema: The contract's schema; the rules are in its fields' metadata.
+        check_duplicates: Whether to check for duplicates; read() passes False.
 
     Raises:
         ValueError: "Schema validation failed: ..." listing every schema problem, or
@@ -303,9 +308,10 @@ def validate_pyspark_dataframe(data: DataFrame, expected_schema: t.StructType) -
                 found.setdefault(problem, {})[name] = totals[i]
         data_problems = [f"{problem} {counts}" for problem, counts in found.items()]
 
-    uniqueness = check_no_duplicate_rows(data, subset=primary_key(expected_schema) or None)
-    if not uniqueness.passed:
-        data_problems.append(uniqueness.message)
+    if check_duplicates:
+        uniqueness = check_no_duplicate_rows(data, subset=primary_key(expected_schema) or None)
+        if not uniqueness.passed:
+            data_problems.append(uniqueness.message)
     if data_problems:
         raise ValueError("Data validation failed: " + "; ".join(data_problems))
 
@@ -356,13 +362,14 @@ def create_pyspark_dataframe(
     file_format: str = "json",
     date_ranges: list[str] | None = None,
     partition_key: str | None = None,
-    check_files: bool = False,
 ) -> DataFrame:
     """Read one source dataset from files, limited to the requested date partitions.
 
-    Every job's read() calls this once per source. JSON is read with `multiLine` set
-    to false, so each line of a file is one JSON record (JSON Lines), as the extract
-    Lambda writes raw files. For a partitioned source, only the
+    Every job's read() calls this once per source. A `json` file is one JSON document,
+    such as an array of records, read with `multiLine`; a `jsonl` file holds one JSON
+    record per line (JSON Lines). With a `schema`, both are also read in FAILFAST mode
+    with the date and timestamp formats from the schema's metadata (see `_json_options`).
+    For a partitioned source, only the
     `{partition_key}={day}` folders that exist are loaded, with `basePath` set so the
     partition column stays in the result.
 
@@ -370,32 +377,29 @@ def create_pyspark_dataframe(
         spark: The active SparkSession.
         file_path: The dataset's root folder, e.g. s3://bucket/orders/.
         schema: The schema to read with; None lets Spark infer one.
-        file_format: The files' format, e.g. json or parquet.
+        file_format: The files' format: json, jsonl or parquet.
         date_ranges: Partition values to read, as YYYY-MM-DD strings.
         partition_key: The dataset's date partition column; None for an unpartitioned
             dataset, which is read whole.
-        check_files: Hold the files to the contract `schema` describes: JSON is read in
-            FAILFAST mode with the date and timestamp formats from the schema's metadata.
-            Only a source whose contract is in the ODCS format sets it; it needs `schema`.
 
     Returns:
         The rows read. For a partitioned read where none of the requested partitions
         exist, an empty DataFrame with `schema`.
 
     Raises:
-        ValueError: If a value in `date_ranges` is not a YYYY-MM-DD string; or, with
-            `check_files`, if `schema` is None, or if the schema's date or timestamp
-            columns set more than one format (see `_json_options`).
+        ValueError: If a value in `date_ranges` is not a YYYY-MM-DD string, or if the
+            schema's date or timestamp columns set more than one format (see
+            `_json_options`).
     """
-    if check_files and schema is None:
-        raise ValueError("check_files needs the contract's schema.")
-    reader = spark.read.format(file_format).option("multiLine", "false")
+    # Spark reads both JSON shapes with its json reader; multiLine tells them apart.
+    spark_format = {"json": "json", "jsonl": "json", "parquet": "parquet"}[file_format]
+    multi_line = "true" if file_format == "json" else "false"
+    reader = spark.read.format(spark_format).option("multiLine", multi_line)
     if schema is not None:
         reader = reader.schema(schema)
-        if check_files and file_format == "json":
+        if spark_format == "json":
             reader = reader.options(**_json_options(schema))
 
-    paths = [file_path]
     if partition_key and date_ranges:
         validate_dates(date_ranges)
         base = file_path.rstrip("/")
@@ -405,9 +409,9 @@ def create_pyspark_dataframe(
             # (or an empty path list) raises AnalysisException, so return an empty
             # frame with the read schema to preserve the "no data" outcome.
             return spark.createDataFrame([], schema)
-        reader = reader.option("basePath", base)
+        return reader.option("basePath", base).load(paths)
 
-    return reader.load(paths)
+    return reader.load(file_path)
 
 
 def _existing_partition_paths(

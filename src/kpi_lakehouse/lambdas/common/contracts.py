@@ -174,7 +174,7 @@ def load_contracts(directory: Path | None = None) -> dict[str, Contract]:
         partitioned = [p["name"] for p in properties if p.get("partitioned")]
         contract = Contract(
             dataset=schema_object["physicalName"],
-            file_format=custom.get("fileFormat", "json"),
+            file_format=custom.get("fileFormat", "jsonl"),
             partition_key=partitioned[0] if partitioned else None,
             columns=columns,
         )

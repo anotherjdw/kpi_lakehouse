@@ -41,14 +41,14 @@ SOURCES = {
         argument="FX_RATES_INPUT_PATH",
         rows=inputs.FX_RATES_ROWS,
         schema=schema_definitions.fx_rates_raw_schema,
-        file_format="json",
+        file_format="jsonl",
         partition_key="rate_date",
     ),
     "dates": SourceFixture(
         argument="DATES_INPUT_PATH",
         rows=inputs.DATES_ROWS,
         schema=schema_definitions.dates_schema,
-        file_format="json",
+        file_format="jsonl",
         partition_key=None,
     ),
 }

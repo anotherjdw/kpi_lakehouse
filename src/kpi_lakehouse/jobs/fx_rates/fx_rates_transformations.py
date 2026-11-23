@@ -176,7 +176,7 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             spark=spark,
             file_path=args.FX_RATES_INPUT_PATH,
             schema=schema_definitions.fx_rates_raw_schema,
-            file_format="json",
+            file_format="jsonl",
             date_ranges=processing_dates["fx_rates"],
             partition_key="rate_date",
         ),
@@ -184,7 +184,7 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             spark=spark,
             file_path=args.DATES_INPUT_PATH,
             schema=schema_definitions.dates_schema,
-            file_format="json",
+            file_format="jsonl",
         ),
     }
     if sources["fx_rates"].isEmpty():
@@ -200,6 +200,16 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             "To allow this, set allow_empty: true on this source in "
             "fx_rates.yaml."
         )
+    validate_pyspark_dataframe(
+        sources["fx_rates"],
+        schema_definitions.fx_rates_raw_schema,
+        check_duplicates=False,
+    )
+    validate_pyspark_dataframe(
+        sources["dates"],
+        schema_definitions.dates_schema,
+        check_duplicates=False,
+    )
     return sources
 
 

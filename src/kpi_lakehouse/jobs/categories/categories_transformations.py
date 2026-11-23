@@ -130,7 +130,7 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             spark=spark,
             file_path=args.CATEGORIES_INPUT_PATH,
             schema=schema_definitions.categories_raw_schema,
-            file_format="json",
+            file_format="jsonl",
         ),
     }
     if sources["categories"].isEmpty():
@@ -139,6 +139,11 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             "To allow this, set allow_empty: true on this source in "
             "categories.yaml."
         )
+    validate_pyspark_dataframe(
+        sources["categories"],
+        schema_definitions.categories_raw_schema,
+        check_duplicates=False,
+    )
     return sources
 
 

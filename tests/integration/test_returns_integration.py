@@ -37,7 +37,7 @@ SOURCES = {
         argument="RETURNS_INPUT_PATH",
         rows=inputs.RETURNS_ROWS,
         schema=schema_definitions.returns_raw_schema,
-        file_format="json",
+        file_format="jsonl",
         partition_key="export_date",
     ),
     "order_items": SourceFixture(

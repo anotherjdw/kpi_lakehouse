@@ -40,7 +40,7 @@ SOURCES = {
         argument="ORDERS_INPUT_PATH",
         rows=inputs.ORDERS_ROWS,
         schema=schema_definitions.orders_raw_schema,
-        file_format="json",
+        file_format="jsonl",
         partition_key="export_date",
     ),
     "fx_rates": SourceFixture(

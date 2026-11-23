@@ -23,7 +23,7 @@ class SourceFixture(NamedTuple):
         argument: The Glue argument holding the source's path, e.g. ORDERS_INPUT_PATH.
         rows: The source's input rows.
         schema: The source's StructType.
-        file_format: How the source's files are stored: json or parquet.
+        file_format: How the source's files are stored: json, jsonl or parquet.
         partition_key: The source's date partition column; None when it is unpartitioned.
     """
 
@@ -111,13 +111,14 @@ def write_source_fixture(
 ) -> None:
     """Write a source's input rows to disk in the source's file format and partition layout.
 
-    Every value is first checked against `schema`. JSON is written with the json module as
-    JSON Lines, one file per partition folder holding one object per line, as the extract
-    Lambda writes raw files; the job reads JSON with `multiLine` set to false, one record
-    per line. A timestamp column whose metadata sets a `format` is written in that layout
-    (see `_timestamp_text`); every other date and timestamp as an ISO string. The partition
-    column is left out of the JSON objects, since the folder name holds its value. Parquet
-    is written by Spark, partitioned by `partition_key` when set.
+    Every value is first checked against `schema`. JSON is written with the json module,
+    one file per partition folder: for `json` one JSON array, which the job reads whole with
+    `multiLine`; for `jsonl` one object per line (JSON Lines), as the extract Lambda writes
+    raw files, which the job reads one record per line. A timestamp column whose metadata
+    sets a `format` is written in that layout (see `_timestamp_text`); every other date and
+    timestamp as an ISO string. The partition column is left out of the JSON objects, since
+    the folder name holds its value. Parquet is written by Spark, partitioned by
+    `partition_key` when set.
     """
     df = rows_to_df(spark, rows, schema)
     if file_format == "parquet":
@@ -143,7 +144,10 @@ def write_source_fixture(
         files.setdefault(folder, []).append(values)
     for folder, objects in files.items():
         folder.mkdir(parents=True, exist_ok=True)
-        text = "".join(json.dumps(obj, default=_json_value) + "\n" for obj in objects)
+        if file_format == "jsonl":
+            text = "".join(json.dumps(obj, default=_json_value) + "\n" for obj in objects)
+        else:
+            text = json.dumps(objects, default=_json_value)
         (folder / "part-00000.json").write_text(text, encoding="utf-8")
 
 

@@ -33,7 +33,7 @@ SOURCES = {
         argument="DATES_INPUT_PATH",
         rows=inputs.DATES_ROWS,
         schema=schema_definitions.dates_schema,
-        file_format="json",
+        file_format="jsonl",
         partition_key=None,
     ),
 }

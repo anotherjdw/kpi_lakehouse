@@ -6,7 +6,7 @@ customProperties:
   - property: layer
     value: raw                     # raw | preprocessed | processed
   - property: fileFormat
-    value: json
+    value: jsonl
 schema:
   - name: dates
     physicalName: dates

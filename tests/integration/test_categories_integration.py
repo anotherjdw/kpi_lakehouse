@@ -32,7 +32,7 @@ SOURCES = {
         argument="CATEGORIES_INPUT_PATH",
         rows=inputs.CATEGORIES_ROWS,
         schema=schema_definitions.categories_raw_schema,
-        file_format="json",
+        file_format="jsonl",
         partition_key=None,
     ),
 }

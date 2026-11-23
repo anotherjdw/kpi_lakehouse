@@ -164,7 +164,7 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             spark=spark,
             file_path=args.DATES_INPUT_PATH,
             schema=schema_definitions.dates_schema,
-            file_format="json",
+            file_format="jsonl",
         ),
     }
     if sources["dates"].isEmpty():
@@ -173,6 +173,11 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             "To allow this, set allow_empty: true on this source in "
             "dim_dates.yaml."
         )
+    validate_pyspark_dataframe(
+        sources["dates"],
+        schema_definitions.dates_schema,
+        check_duplicates=False,
+    )
     return sources
 
 

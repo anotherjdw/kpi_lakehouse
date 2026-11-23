@@ -223,7 +223,7 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             spark=spark,
             file_path=args.CUSTOMERS_INPUT_PATH,
             schema=schema_definitions.customers_raw_schema,
-            file_format="json",
+            file_format="jsonl",
             date_ranges=processing_dates["customers"],
             partition_key="snapshot_date",
         ),
@@ -235,6 +235,11 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             "To allow this, set allow_empty: true on this source in "
             "customers.yaml."
         )
+    validate_pyspark_dataframe(
+        sources["customers"],
+        schema_definitions.customers_raw_schema,
+        check_duplicates=False,
+    )
     return sources
 
 

@@ -4,7 +4,7 @@ validate_pyspark_dataframe runs in each job's write(), before the file write, an
 on a source with its own contract. It checks exact column types (decimal precision/scale
 included, nullable ignored), then, in one pass, nulls in non-nullable columns and the
 allowed values, bounds, lengths and patterns the fields' metadata sets, then uniqueness of
-the key, and reports every broken rule at once.
+the key (in write() only), and reports every broken rule at once.
 """
 
 from datetime import UTC, date, datetime
@@ -334,6 +334,14 @@ def test_schema_without_a_key_is_checked_for_duplicate_rows(spark: SparkSession)
         validate_pyspark_dataframe(
             spark.createDataFrame([Row(name="a", size=1), Row(name="a", size=1)], schema), schema
         )
+
+
+def test_duplicates_pass_when_the_duplicate_check_is_off(spark: SparkSession) -> None:
+    """read() checks a source without the duplicate check, so repeated rows pass."""
+    rows = [Row(date_utc=DAY, shop_id=1, earnings_eur=Decimal("1.00"))] * 2
+    df = spark.createDataFrame(rows, EXPECTED_SCHEMA)
+
+    validate_pyspark_dataframe(df, EXPECTED_SCHEMA, check_duplicates=False)
 
 
 def test_bound_on_a_string_column_raises(spark: SparkSession) -> None:
