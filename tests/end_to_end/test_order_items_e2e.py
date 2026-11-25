@@ -41,7 +41,7 @@ SOURCES = {
         argument="ORDER_ITEMS_INPUT_PATH",
         rows=inputs.ORDER_ITEMS_ROWS,
         schema=schema_definitions.order_items_raw_schema,
-        file_format="json",
+        file_format="jsonl",
         partition_key="order_date",
     ),
     "orders": SourceFixture(

@@ -29,7 +29,7 @@ job:
         columns:            # columns this transformation adds; delete the block if none
           - name: date_key
             type: int
-            nullable: false
+            required: true
     - name: create year column
       description: Create a year column, that extracts the year from the date column.
       inputs: [create date key]
@@ -39,7 +39,7 @@ job:
         columns:
           - name: year
             type: int
-            nullable: false
+            required: true
     - name: create quarter column
       description: Create a quarter column, where quarter = quarter of date, 1 to 4.
       inputs: [create year column]
@@ -49,7 +49,7 @@ job:
         columns:
         - name: quarter
           type: int
-          nullable: false
+          required: true
     - name: create month column
       description: Create a month column, where month = month of date, 1 to 12.
       inputs: [create quarter column]
@@ -59,7 +59,7 @@ job:
         columns:
           - name: month
             type: int
-            nullable: false
+            required: true
     - name: create iso week column
       description: Create an iso_week column, where iso_week = the ISO 8601 week of the year of date.
       inputs: [create month column]
@@ -69,7 +69,7 @@ job:
         columns:
           - name: iso_week
             type: int
-            nullable: false
+            required: true
     - name: create weekday column
       description: Create a weekday column, where weekday = the ISO day of the week - 1 for Monday to 7 for Sunday.
       inputs: [create iso week column]
@@ -79,7 +79,7 @@ job:
         columns:
           - name: weekday
             type: int
-            nullable: false
+            required: true
     - name: create weekend flag
       description: Create an is_weekend column, where is_weekend = true when weekday is 6 or 7, otherwise false.
       inputs: [create weekday column]
@@ -89,7 +89,7 @@ job:
         columns:
           - name: is_weekend
             type: boolean
-            nullable: false
+            required: true
     - name: create month start column
       description: Create a month_start column, which extracts the date field to create columns that show the first date of the given month in YYYY-MM-DD format. For example, for 2026-02-17, the month_begin would be 2026-02-01.
       inputs: [create weekend flag]
@@ -99,7 +99,7 @@ job:
         columns:
           - name: month_start
             type: date
-            nullable: false
+            required: true
     - name: create month end column
       description: Create a month_end column, which extracts the date field to create columns that show the last date of the given month in YYYY-MM-DD format. For example, for 2026-02-17, the month_end would be 2026-02-28.
       inputs: [ create month start column ]
@@ -109,4 +109,4 @@ job:
         columns:
           - name: month_end
             type: date
-            nullable: false
+            required: true

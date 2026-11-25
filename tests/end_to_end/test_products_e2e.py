@@ -41,7 +41,7 @@ SOURCES = {
         argument="PRODUCTS_INPUT_PATH",
         rows=inputs.PRODUCTS_ROWS,
         schema=schema_definitions.products_raw_schema,
-        file_format="json",
+        file_format="jsonl",
         partition_key="snapshot_date",
     ),
 }

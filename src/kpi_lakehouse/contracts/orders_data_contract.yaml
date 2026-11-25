@@ -1,79 +1,170 @@
-# Output contract of the orders ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: preprocessed
-  dataset: orders
-  description: Latest version of order records ingested from the backend.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [order_id, updated_at]    # checked for duplicates on every write
-  schema: # include the partition column, typed date
-    - name: order_date
-      type: date
-      nullable: false
-      description: "Date the order was placed (UTC)."
-    - name: export_date
-      type: date
-      nullable: false
-      description: "Date the record was exported. Partition column; not the order date."
-    - name: order_id
-      type: string
-      nullable: false
-      description: "Natural key of the order."
-    - name: customer_id
-      type: string
-      nullable: false
-      description: "Foreign key to customers.customer_id."
-    - name: session_id
-      type: string
-      nullable: true
-      description: "Foreign key to session_events.session_id. Null for orders placed by customer service or without a tracked session."
-    - name: order_ts
-      type: timestamp
-      nullable: false
-      description: "Time the order was placed (UTC)."
-    - name: order_status
-      type: string
-      nullable: false
-      description: "Status of this version: placed | paid | shipped | delivered | cancelled."
-    - name: updated_at
-      type: timestamp
-      nullable: false
-      description: "Time this status version was written (UTC). The latest version per order_id is the current one."
-    - name: currency_code
-      type: string
-      nullable: false
-      description: "ISO 4217 currency the order was charged in: EUR | CHF | PLN | SEK | DKK."
-    - name: voucher_code
-      type: string
-      nullable: true
-      description: "Voucher redeemed on the order. Its value is already allocated to order_items.discount_amount."
-    - name: payment_method
-      type: string
-      nullable: false
-      description: "card | paypal | klarna_invoice | bank_transfer."
-    - name: shipping_country
-      type: string
-      nullable: false
-      description: "ISO 3166-1 alpha-2 country the order ships to."
-    - name: rate_date
-      type: date
-      nullable: false
-      description: "Date of the rate used to convert the shipping fee; equals order_date."
-    - name: base_currency
-      type: string
-      nullable: false
-      description: "Always EUR."
-    - name: quote_currency
-      type: string
-      nullable: false
-      description: "ISO 4217 currency of the rate used; equals currency_code."
-    - name: rate
-      type: decimal(18,8)
-      nullable: false
-      description: "Units of quote_currency per 1 EUR. An amount converts to EUR as amount / rate."
-    - name: shipping_fee_eur
-      type: decimal(12,2)
-      nullable: false
-      description: "Shipping fee charged, in Euros, including VAT."
+apiVersion: v3.2.0
+kind: DataContract
+id: orders                         # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: preprocessed            # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: orders
+    physicalName: orders
+    logicalType: object
+    description: Latest version of order records ingested from the backend.
+    properties:
+      - name: order_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date the order was placed (UTC).
+        classification: internal
+        examples: [2026-11-04, 2026-10-12]
+      - name: export_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date the record was exported; not the order date.
+        classification: internal
+        examples: [2026-11-02, 2026-10-14]
+      - name: order_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Natural key of the order.
+        classification: internal
+        primaryKey: true
+        examples: [ORD-000184233, ORD-000007712]
+      - name: customer_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Foreign key to customers.customer_id.
+        classification: personal
+        relationships:
+          - to: customers.customer_id
+        examples: [ C0041877, C0003921 ]
+      - name: session_id
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          Foreign key to session_events.session_id. Null for orders placed by customer service or
+          without a tracked session.
+        classification: personal
+        relationships:
+          - to: session_events.session_id
+        examples: [ 7c1e9a04b2d64f58a3e0c97b15d2f86a, e40b6d2fa91c4387b5d0a6e2c8f71b39 ]
+      - name: order_ts
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: Time the order was placed (UTC).
+        classification: internal
+        examples: ["2026-11-02T09:41:17.204Z", "2026-10-14T21:03:55.918Z"]
+      - name: order_status
+        logicalType: string
+        physicalType: string
+        required: true
+        description: "Status of this version: placed | paid | shipped | delivered | cancelled."
+        classification: internal
+        enum:
+          - value: placed
+          - value: paid
+          - value: shipped
+          - value: delivered
+          - value: cancelled
+        examples: [ paid, delivered, cancelled ]
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: >
+          Time this status version was written (UTC). The latest version per order_id is the current
+          one.
+        classification: internal
+        primaryKey: true
+        examples: ["2026-11-03T14:22:08.611Z", "2026-10-15T07:10:42.037Z"]
+      - name: currency_code
+        logicalType: string
+        physicalType: string
+        required: true
+        description: "ISO 4217 currency the order was charged in: EUR | CHF | PLN | SEK | DKK."
+        classification: internal
+        enum:
+          - value: EUR
+          - value: CHF
+          - value: PLN
+          - value: SEK
+          - value: DKK
+        examples: [ EUR, PLN ]
+      - name: voucher_code
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          Voucher redeemed on the order. Its value is already allocated to
+          order_items.discount_amount.
+        classification: internal
+        examples: [AUTUMN10, WELCOME15]
+      - name: payment_method
+        logicalType: string
+        physicalType: string
+        required: true
+        description: card | paypal | klarna_invoice | bank_transfer.
+        classification: internal
+        enum:
+          - value: card
+          - value: paypal
+          - value: klarna_invoice
+          - value: bank_transfer
+        examples: [ card, klarna_invoice ]
+      - name: shipping_country
+        logicalType: string
+        physicalType: string
+        required: true
+        description: ISO 3166-1 alpha-2 country the order ships to.
+        classification: internal
+        examples: [DE, PL, SE]
+      - name: rate_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date of the rate used to convert the shipping fee; equals order_date.
+        classification: internal
+        examples: [2026-09-15, 2026-10-15]
+      - name: base_currency
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Always EUR.
+        classification: internal
+        enum:
+          - value: EUR
+      - name: quote_currency
+        logicalType: string
+        physicalType: string
+        required: true
+        description: ISO 4217 currency of the rate used; equals currency_code.
+        classification: internal
+        enum:
+          - value: EUR
+          - value: CHF
+          - value: PLN
+          - value: SEK
+          - value: DKK
+        examples: [ EUR, PLN ]
+      - name: rate
+        logicalType: number
+        physicalType: decimal(18,8)
+        required: true
+        description: Units of quote_currency per 1 EUR. An amount converts to EUR as amount / rate.
+        classification: internal
+        examples: ["4.27310000", "1.00000000"]
+      - name: shipping_fee_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: Shipping fee charged, in Euros, including VAT.
+        classification: internal
+        examples: ["4.90", "0.00"]

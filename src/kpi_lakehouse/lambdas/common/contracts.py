@@ -148,25 +148,34 @@ def default_contracts_dir() -> Path:
 
 
 def load_contracts(directory: Path | None = None) -> dict[str, Contract]:
-    """Load every `*_raw_data_contract.yaml`, keyed by dataset name (e.g. `orders`)."""
+    """Load every `*_raw_data_contract.yaml` (ODCS v3.2.0), keyed by dataset name (e.g. `orders`).
+
+    Reads only what `Contract.check` uses: the dataset (`schema[0].physicalName`), the
+    `fileFormat` custom property, the `partitioned: true` column, and per column its
+    `physicalType`, `required`, and the `minimum` and `maximum` of its `logicalTypeOptions`.
+    """
     directory = directory or default_contracts_dir()
     contracts = {}
     for path in sorted(directory.glob("*_raw_data_contract.yaml")):
-        spec = yaml.safe_load(path.read_text())["contract"]
+        document = yaml.safe_load(path.read_text())
+        schema_object = document["schema"][0]
+        custom = {p["property"]: p["value"] for p in document.get("customProperties", [])}
+        properties = schema_object["properties"]
         columns = tuple(
             Column(
-                name=c["name"],
-                type=c["type"].replace(" ", ""),
-                nullable=bool(c["nullable"]),
-                min=(c.get("constraints") or {}).get("min"),
-                max=(c.get("constraints") or {}).get("max"),
+                name=p["name"],
+                type=p["physicalType"].replace(" ", ""),
+                nullable=not p["required"],
+                min=(p.get("logicalTypeOptions") or {}).get("minimum"),
+                max=(p.get("logicalTypeOptions") or {}).get("maximum"),
             )
-            for c in spec["schema"]
+            for p in properties
         )
+        partitioned = [p["name"] for p in properties if p.get("partitioned")]
         contract = Contract(
-            dataset=spec["dataset"],
-            file_format=spec.get("file_format", "json"),
-            partition_key=spec.get("partition_key"),
+            dataset=schema_object["physicalName"],
+            file_format=custom.get("fileFormat", "jsonl"),
+            partition_key=partitioned[0] if partitioned else None,
             columns=columns,
         )
         contracts[contract.dataset] = contract

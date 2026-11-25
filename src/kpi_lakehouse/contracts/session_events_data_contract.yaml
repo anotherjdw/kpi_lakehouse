@@ -1,75 +1,155 @@
-# Output contract of the session_events ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: preprocessed
-  dataset: session_events
-  description: Event level dataset of user activity.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [ event_id ]
-  schema: # include the partition column, typed date
-    - name: event_date
-      type: date
-      nullable: false
-      description: "Date of event_ts (UTC). Partition column."
-    - name: event_id
-      type: string
-      nullable: false
-      description: "Client-generated unique event ID. Duplicates are retries of the same event."
-    - name: event_ts
-      type: timestamp
-      nullable: false
-      description: "Time the event happened on the client (UTC)."
-    - name: session_id
-      type: string
-      nullable: false
-      description: "Session the event belongs to; a session ends after 30 minutes of inactivity."
-    - name: anonymous_id
-      type: string
-      nullable: false
-      description: "Device cookie or app install ID, stable across sessions on one device."
-    - name: customer_id
-      type: string
-      nullable: true
-      description: "Foreign key to customers.customer_id. Set only after the visitor logs in, so it can change within a session."
-    - name: event_type
-      type: string
-      nullable: false
-      description: "page_view | product_view | add_to_cart | begin_checkout | purchase."
-    - name: product_id
-      type: string
-      nullable: true
-      description: "Foreign key to products.product_id for product_view and add_to_cart events."
-    - name: order_id
-      type: string
-      nullable: true
-      description: "Foreign key to orders.order_id for purchase events."
-    - name: utm_source
-      type: string
-      nullable: true
-      description: "utm_source of the landing URL, e.g. google, facebook, newsletter."
-    - name: utm_medium
-      type: string
-      nullable: true
-      description: "utm_medium of the landing URL, e.g. cpc, paid_social, email, affiliate."
-    - name: utm_campaign
-      type: string
-      nullable: true
-      description: "utm_campaign of the landing URL; matches marketing_spend.utm_campaign."
-    - name: referrer_domain
-      type: string
-      nullable: true
-      description: "Domain of the HTTP referrer. Null for direct visits and in-app navigation."
-    - name: device_type
-      type: string
-      nullable: false
-      description: "desktop | mobile_web | ios_app | android_app."
-    - name: country_code
-      type: string
-      nullable: true
-      description: "ISO 3166-1 alpha-2 country derived from the IP address."
-    - name: mkt_channel
-      type: string
-      nullable: true
-      description: "The marketing channel from which the customer entered the website."
+apiVersion: v3.2.0
+kind: DataContract
+id: session_events                 # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: preprocessed            # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: session_events
+    physicalName: session_events
+    logicalType: object
+    description: Event level dataset of user activity.
+    properties:
+      - name: event_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date of event_ts (UTC). Partition column.
+        classification: internal
+        examples: [2026-11-02, 2026-10-31]
+      - name: event_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Client-generated unique event ID. Duplicates are retries of the same event.
+        classification: internal
+        primaryKey: true
+        examples: [b31f07c9e2a84d6590c1e7f3a5d82b46, 5e8a2d01f7c94b3ea6d0b9c4127f8e53]
+      - name: event_ts
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: Time the event happened on the client (UTC).
+        classification: internal
+        examples: ["2026-11-02T19:22:41.093Z", "2026-10-31T07:58:14.516Z"]
+      - name: session_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Session the event belongs to; a session ends after 30 minutes of inactivity.
+        classification: personal
+        examples: [7c1e9a04b2d64f58a3e0c97b15d2f86a, e40b6d2fa91c4387b5d0a6e2c8f71b39]
+      - name: anonymous_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Device cookie or app install ID, stable across sessions on one device.
+        classification: personal
+        examples: [3a9e17c40bd25f68, f0c2846e9a17d3b5]
+      - name: customer_id
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          Foreign key to customers.customer_id. Set only after the visitor logs in, so it can change
+          within a session.
+        classification: personal
+        relationships:
+          - to: customers.customer_id
+        examples: [ C0041877, C0003921 ]
+      - name: event_type
+        logicalType: string
+        physicalType: string
+        required: true
+        description: What the visitor did.
+        classification: internal
+        enum:
+          - value: page_view
+          - value: product_view
+          - value: add_to_cart
+          - value: begin_checkout
+          - value: purchase
+        examples: [ product_view, add_to_cart, purchase ]
+      - name: product_id
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Foreign key to products.product_id for product_view and add_to_cart events.
+        classification: internal
+        relationships:
+          - to: products.product_id
+        examples: [ P00412, P00093 ]
+      - name: order_id
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Foreign key to orders.order_id for purchase events.
+        classification: internal
+        relationships:
+          - to: orders.order_id
+        examples: [ ORD-000184233, ORD-000007712 ]
+      - name: utm_source
+        logicalType: string
+        physicalType: string
+        required: false
+        description: utm_source of the landing URL, e.g. google, facebook, newsletter.
+        classification: internal
+        examples: [google, facebook, newsletter]
+      - name: utm_medium
+        logicalType: string
+        physicalType: string
+        required: false
+        description: utm_medium of the landing URL, e.g. cpc, paid_social, email, affiliate.
+        classification: internal
+        examples: [cpc, email]
+      - name: utm_campaign
+        logicalType: string
+        physicalType: string
+        required: false
+        description: utm_campaign of the landing URL; matches marketing_spend.utm_campaign.
+        classification: internal
+        examples: [winter_boots_de, retargeting_nordics]
+      - name: referrer_domain
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Domain of the HTTP referrer. Null for direct visits and in-app navigation.
+        classification: internal
+        examples: [google.com, laufblog.example]
+      - name: device_type
+        logicalType: string
+        physicalType: string
+        required: true
+        description: The kind of device the event came from.
+        classification: internal
+        enum:
+          - value: desktop
+          - value: mobile_web
+          - value: ios_app
+          - value: android_app
+        examples: [ mobile_web, ios_app ]
+      - name: country_code
+        logicalType: string
+        physicalType: string
+        required: false
+        description: ISO 3166-1 alpha-2 country derived from the IP address.
+        classification: internal
+        examples: [DE, DK, CH]
+      - name: mkt_channel
+        logicalType: string
+        physicalType: string
+        required: false
+        description: The marketing channel from which the customer entered the website.
+        classification: internal
+        enum:
+          - value: paid_search
+          - value: paid_social
+          - value: affiliate
+          - value: email
+          - value: organic_search
+          - value: referral
+          - value: direct
+        examples: [ paid_search, organic_search ]

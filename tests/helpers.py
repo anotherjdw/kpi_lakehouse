@@ -3,13 +3,17 @@
 import base64
 import json
 from collections.abc import Mapping
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, NamedTuple
 
 from pyspark.sql import DataFrame, Row, SparkSession
-from pyspark.sql.types import DataType, StructType
+from pyspark.sql.types import DataType, StructType, TimestampType
+
+# The one timestamp layout a fixture can be written in when a column's contract sets a
+# `format`: milliseconds and a Z, as the extract Lambda writes them.
+MILLISECONDS_UTC = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"
 
 
 class SourceFixture(NamedTuple):
@@ -19,7 +23,7 @@ class SourceFixture(NamedTuple):
         argument: The Glue argument holding the source's path, e.g. ORDERS_INPUT_PATH.
         rows: The source's input rows.
         schema: The source's StructType.
-        file_format: How the source's files are stored: json or parquet.
+        file_format: How the source's files are stored: json, jsonl or parquet.
         partition_key: The source's date partition column; None when it is unpartitioned.
     """
 
@@ -74,6 +78,29 @@ def _json_value(value: Any) -> str:
     raise TypeError(f"Can't write {value!r} to a JSON fixture file.")
 
 
+def _timestamp_text(column: str, value: datetime, layout: str) -> str:
+    """Write a fixture timestamp in the layout its contract's `format` sets.
+
+    Fixture timestamps are naive, and PySpark turns a naive datetime into a timestamp, and
+    a timestamp back into one, in this process's local time zone. So the value is moved
+    from that zone to UTC before it is written with a Z, and reads back unchanged. Only
+    MILLISECONDS_UTC is supported, and a value finer than milliseconds is refused rather
+    than cut short.
+
+    Raises:
+        ValueError: If `layout` is another format, or `value` has digits below milliseconds.
+    """
+    if layout != MILLISECONDS_UTC:
+        raise ValueError(
+            f"Column {column} sets format {layout!r}; fixtures can only be written as "
+            f"{MILLISECONDS_UTC!r}."
+        )
+    if value.microsecond % 1000:
+        raise ValueError(f"Column {column} value {value} is finer than milliseconds.")
+    utc = value.astimezone(UTC)
+    return utc.strftime("%Y-%m-%dT%H:%M:%S.") + f"{utc.microsecond // 1000:03d}Z"
+
+
 def write_source_fixture(
     spark: SparkSession,
     rows: list[Row],
@@ -84,11 +111,14 @@ def write_source_fixture(
 ) -> None:
     """Write a source's input rows to disk in the source's file format and partition layout.
 
-    Every value is first checked against `schema`. JSON is written as one JSON array per
-    partition folder with the json module, and the job reads each file whole (multiLine):
-    Spark's JSON writer puts one object per line, of which such a read keeps only the
-    first. The partition column is left out of the JSON objects, since the folder name
-    holds its value. Parquet is written by Spark, partitioned by `partition_key` when set.
+    Every value is first checked against `schema`. JSON is written with the json module,
+    one file per partition folder: for `json` one JSON array, which the job reads whole with
+    `multiLine`; for `jsonl` one object per line (JSON Lines), as the extract Lambda writes
+    raw files, which the job reads one record per line. A timestamp column whose metadata
+    sets a `format` is written in that layout (see `_timestamp_text`); every other date and
+    timestamp as an ISO string. The partition column is left out of the JSON objects, since
+    the folder name holds its value. Parquet is written by Spark, partitioned by
+    `partition_key` when set.
     """
     df = rows_to_df(spark, rows, schema)
     if file_format == "parquet":
@@ -97,16 +127,27 @@ def write_source_fixture(
             writer = writer.partitionBy(partition_key)
         writer.parquet(str(path))
         return
+    layouts = {
+        field.name: field.metadata["format"]
+        for field in schema.fields
+        if isinstance(field.dataType, TimestampType) and "format" in field.metadata
+    }
     files: dict[Path, list[dict[str, Any]]] = {}
     for row in rows:
         values = row.asDict()
+        for column, layout in layouts.items():
+            if values[column] is not None:
+                values[column] = _timestamp_text(column, values[column], layout)
         folder = path
         if partition_key is not None:
             folder = path / f"{partition_key}={values.pop(partition_key).isoformat()}"
         files.setdefault(folder, []).append(values)
     for folder, objects in files.items():
         folder.mkdir(parents=True, exist_ok=True)
-        text = json.dumps(objects, default=_json_value)
+        if file_format == "jsonl":
+            text = "".join(json.dumps(obj, default=_json_value) + "\n" for obj in objects)
+        else:
+            text = json.dumps(objects, default=_json_value)
         (folder / "part-00000.json").write_text(text, encoding="utf-8")
 
 

@@ -1,11 +1,20 @@
-# Source contract dates: data no job in this project writes. Written by
-# `scaffold create-source-contracts` for fx_rates. Describe the files exactly as they are on
-# disk. Generation-time input; never deployed.
-contract:
-  layer: raw                  # raw | preprocessed | processed
-  dataset: dates
-  file_format: json
-  schema:                     # include the partition column, typed date
-    - name: date
-      type: date
-      nullable: false
+apiVersion: v3.2.0
+kind: DataContract
+id: dates                          # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: raw                     # raw | preprocessed | processed
+  - property: fileFormat
+    value: jsonl
+schema:
+  - name: dates
+    physicalName: dates
+    logicalType: object
+    properties:
+      - name: date
+        logicalType: date
+        physicalType: date
+        required: true
+        classification: internal
+        examples: [ 2026-11-02, 2026-10-14 ]

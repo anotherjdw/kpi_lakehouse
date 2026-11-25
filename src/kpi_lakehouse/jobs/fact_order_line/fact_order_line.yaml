@@ -79,6 +79,7 @@ job:
         columns:
           - name: cost_eur
             type: decimal(12,2)
+            required: false
     - name: create gross margin column
       description: Create a gross_margin_eur column, where gross_margin_eur is the difference between the net_amount_eur and cost_eur.
       inputs: [create cost column]
@@ -88,6 +89,7 @@ job:
         columns:
           - name: gross_margin_eur
             type: decimal(12,2)
+            required: false
     - name: keep latest return status
       description: Keep the return rows with the latest updated_at per return_id.
       inputs: [returns]
@@ -103,12 +105,16 @@ job:
         columns:
           - name: order_id
             type: string
+            required: true
           - name: line_number
             type: int
+            required: true
           - name: returned_quantity
             type: int
+            required: true
           - name: refund_net_eur
             type: decimal(12,2)
+            required: true
     - name: join aggregated returns to order data
       description: Left join aggregate returns to the order data on order_id and line_number. Keep every order line.
       inputs: [aggregate returns, create gross margin column]
@@ -130,6 +136,7 @@ job:
         columns:
           - name: net_revenue_after_returns_eur
             type: decimal(12,2)
+            required: true
     - name: keep session landing row
       description: Keep the session row with the earliest first_event_time per session_id.
       inputs: [sessions]
@@ -145,6 +152,7 @@ job:
         columns:
           - name: session_channel
             type: string
+            required: false
     - name: join sessions for fallback channel
       description: >
         Left join sessions to the order lines on customer_id, matching sessions whose first_mkt_channel is not direct and whose first_event_time is in [order_ts - 30 days, order_ts). Add the match’s first_mkt_channel as fallback_channel. If several sessions match a line, keep only the latest first_event_time (ties: highest session_id), so each order_id and line_number appears once. A line with no match keeps one row with fallback_channel null.
@@ -156,6 +164,7 @@ job:
         columns:
           - name: fallback_channel
             type: string
+            required: false
     - name: create mkt channel
       description: >
         Create a mkt_channel column by coalescing the session_channel and fallback_channel, in that order. If the mkt_channel value is still null, fill the null values with 'direct'.
@@ -167,6 +176,7 @@ job:
         columns:
           - name: mkt_channel
             type: string
+            required: true
     - name: create date key
       description: Create a date_key column, where date_key is the order_date formatted as yyyyMMdd and cast as an integer.
       inputs: [create mkt channel]
@@ -176,3 +186,4 @@ job:
         columns:
           - name: date_key
             type: int
+            required: true

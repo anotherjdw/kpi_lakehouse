@@ -158,6 +158,11 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             "To allow this, set allow_empty: true on this source in "
             "session_events.yaml."
         )
+    validate_pyspark_dataframe(
+        sources["session_events"],
+        schema_definitions.session_events_raw_schema,
+        check_duplicates=False,
+    )
     return sources
 
 
@@ -172,11 +177,7 @@ def write(output: DataFrame, output_file_path: str, output_table: str) -> None:
     """Check the output against its contract, write it as parquet, then register its partitions."""
     output = output.persist()
     try:
-        validate_pyspark_dataframe(
-            output,
-            schema_definitions.session_events_schema,
-            unique_key=["event_id"],
-        )
+        validate_pyspark_dataframe(output, schema_definitions.session_events_schema)
         write_pyspark_dataframe(
             output_dataframe=output,
             output_file_path=output_file_path,

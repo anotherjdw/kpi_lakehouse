@@ -1,55 +1,124 @@
-# Output contract of the fact_session ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: processed
-  dataset: fact_session
-  description: One row per session and event date, with its date key, landing marketing channel, customer version and whether it led to an order.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [session_id, event_date]    # checked for duplicates on every write
-  schema: # include the partition column, typed date
-    - name: session_id
-      type: string
-      nullable: false
-      description: "Session the events belong to; a session ends after 30 minutes of inactivity."
-    - name: event_date
-      type: date
-      nullable: false
-      description: "Date of the session's events (UTC). Partition column."
-    - name: first_event_time
-      type: timestamp
-      nullable: false
-      description: "Time the session's first event happened on the client (UTC)."
-    - name: last_event_time
-      type: timestamp
-      nullable: true
-      description: "Time the session's last event happened on the client (UTC)."
-    - name: customer_id
-      type: string
-      nullable: true
-      description: "Foreign key to dim_customer.customer_id. Null for sessions where the visitor never logged in."
-    - name: last_event_type
-      type: string
-      nullable: false
-      description: "The last page type the visitor viewed during the session."
-    - name: order_id
-      type: string
-      nullable: true
-      description: "Foreign key to orders.order_id when the session ended in a purchase."
-    - name: customer_version_id
-      type: string
-      nullable: true
-      description: "Foreign key to dim_customer.customer_version_id: the customer's version valid on event_date. Null when customer_id is null or no version was valid on that date."
-    - name: date_key
-      type: int
-      nullable: false
-      description: "event_date as yyyyMMdd. Foreign key to dim_dates.date_key."
-    - name: converted_customer
-      type: boolean
-      nullable: false
-      description: "True when the session ended in a purchase (order_id is not null)."
-    - name: mkt_channel
-      type: string
-      nullable: true
-      description: "Marketing channel the session landed from: paid_search | paid_social | affiliate | email | organic_search | referral | direct. Foreign key to dim_channel.mkt_channel."
+apiVersion: v3.2.0
+kind: DataContract
+id: fact_session                   # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: processed               # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: fact_session
+    physicalName: fact_session
+    logicalType: object
+    description: >
+      One row per session and event date, with its date key, landing marketing channel, customer
+      version and whether it led to an order.
+    properties:
+      - name: session_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Session the events belong to; a session ends after 30 minutes of inactivity.
+        classification: personal
+        primaryKey: true
+        examples: [7c1e9a04b2d64f58a3e0c97b15d2f86a, e40b6d2fa91c4387b5d0a6e2c8f71b39]
+      - name: event_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date of the session's events (UTC). Partition column.
+        classification: internal
+        primaryKey: true
+        examples: [2026-11-02, 2026-10-31]
+      - name: first_event_time
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: Time the session's first event happened on the client (UTC).
+        classification: internal
+        examples: ["2026-11-02T19:22:41.093Z", "2026-10-31T07:58:14.516Z"]
+      - name: last_event_time
+        logicalType: timestamp
+        physicalType: timestamp
+        required: false
+        description: Time the session's last event happened on the client (UTC).
+        classification: internal
+        examples: ["2026-11-02T19:41:03.250Z", "2026-10-31T08:12:47.802Z"]
+      - name: customer_id
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          Foreign key to dim_customer.customer_id. Null for sessions where the visitor never logged
+          in.
+        classification: personal
+        relationships:
+          - to: dim_customer.customer_id
+        examples: [ C0041877, C0003921 ]
+      - name: last_event_type
+        logicalType: string
+        physicalType: string
+        required: true
+        description: The last page type the visitor viewed during the session.
+        classification: internal
+        enum:
+          - value: page_view
+          - value: product_view
+          - value: add_to_cart
+          - value: begin_checkout
+          - value: purchase
+        examples: [ product_view, purchase ]
+      - name: order_id
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Foreign key to orders.order_id when the session ended in a purchase.
+        classification: internal
+        relationships:
+          - to: orders.order_id
+        examples: [ ORD-000184233, ORD-000007712 ]
+      - name: customer_version_id
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          Foreign key to dim_customer.customer_version_id: the customer's version valid on
+          event_date. Null when customer_id is null or no version was valid on that date.
+        classification: personal
+        relationships:
+          - to: dim_customer.customer_version_id
+        examples: [ e1c4a7d02b9f6e3a8c5d1f7b4e0a9c2d6f3b8e5a1c7d4f0b9e2a6c3d8f5b1e7a, 52d8f1b6e3a9c0d7f4b2e8a5c1d6f9b3e0a7c4d2f8b5e1a9c6d3f0b7e4a2c8d5 ]
+      - name: date_key
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: event_date as yyyyMMdd. Foreign key to dim_dates.date_key.
+        classification: internal
+        relationships:
+          - to: dim_dates.date_key
+        examples: [ 20261102, 20261031 ]
+      - name: converted_customer
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        description: True when the session ended in a purchase (order_id is not null).
+        classification: internal
+        examples: [false, true]
+      - name: mkt_channel
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          Marketing channel the session landed from: paid_search | paid_social | affiliate | email |
+          organic_search | referral | direct. Foreign key to dim_channel.mkt_channel.
+        classification: internal
+        enum:
+          - value: paid_search
+          - value: paid_social
+          - value: affiliate
+          - value: email
+          - value: organic_search
+          - value: referral
+          - value: direct
+        examples: [ paid_social, organic_search ]

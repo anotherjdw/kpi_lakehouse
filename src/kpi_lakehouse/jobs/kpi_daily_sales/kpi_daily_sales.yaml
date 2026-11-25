@@ -30,20 +30,28 @@ job:
         columns:
           - name: order_date
             type: date
+            required: true
           - name: orders
             type: int
+            required: true
           - name: cancelled_orders
             type: int
+            required: true
           - name: units
             type: int
+            required: false
           - name: gmv_eur
             type: decimal(12,2)
+            required: false
           - name: net_sales_eur
             type: decimal(12,2)
+            required: false
           - name: net_revenue_eur
             type: decimal(12,2)
+            required: false
           - name: gross_margin_eur
             type: decimal(12,2)
+            required: false
     - name: create date key
       description: Create a date_key column, where date_key is the order_date formatted as yyyyMMdd and cast as an integer.
       inputs: [ aggregate daily totals ]
@@ -53,6 +61,7 @@ job:
         columns:
           - name: date_key
             type: int
+            required: true
     - name: create average order value column
       description: Create an aov_eur column, where aov_eur = net_revenue_eur / orders. Leave the aov_eur values null if orders is 0.
       inputs: [ create date key ]
@@ -62,6 +71,7 @@ job:
         columns:
           - name: aov_eur
             type: decimal(12,2)
+            required: false
     - name: create gross margin percentage column
       description: Create a gross_margin_pct column, where gross_margin_pct = gross_margin_eur / net_sales_eur. Leave the gross_margin_pct values null if net_sales_eur is 0.
       inputs: [ create average order value column ]
@@ -71,6 +81,7 @@ job:
         columns:
           - name: gross_margin_pct
             type: decimal(2,2)
+            required: false
     - name: create cancellation rate column
       description: Create a cancellation_rate column, where cancellation_rate = cancelled_orders / (orders + cancelled_orders). Leave the cancellation_rate values null if the sum of orders and cancelled orders is 0.
       inputs: [ create gross margin percentage column ]
@@ -80,3 +91,4 @@ job:
         columns:
           - name: cancellation_rate
             type: decimal(2,2)
+            required: false

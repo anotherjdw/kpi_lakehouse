@@ -194,11 +194,7 @@ def write(output: DataFrame, output_file_path: str, output_table: str) -> None:
     """Check the output against its contract, write it as parquet, then register its partitions."""
     output = output.persist()
     try:
-        validate_pyspark_dataframe(
-            output,
-            schema_definitions.dim_product_schema,
-            unique_key=["product_id", "valid_from"],
-        )
+        validate_pyspark_dataframe(output, schema_definitions.dim_product_schema)
         write_pyspark_dataframe(
             output_dataframe=output,
             output_file_path=output_file_path,

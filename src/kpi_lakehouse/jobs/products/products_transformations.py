@@ -132,7 +132,7 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             spark=spark,
             file_path=args.PRODUCTS_INPUT_PATH,
             schema=schema_definitions.products_raw_schema,
-            file_format="json",
+            file_format="jsonl",
             date_ranges=processing_dates["products"],
             partition_key="snapshot_date",
         ),
@@ -144,6 +144,11 @@ def read(args: argparse.Namespace, processing_dates: dict[str, list[str]]) -> di
             "To allow this, set allow_empty: true on this source in "
             "products.yaml."
         )
+    validate_pyspark_dataframe(
+        sources["products"],
+        schema_definitions.products_raw_schema,
+        check_duplicates=False,
+    )
     return sources
 
 
@@ -160,11 +165,7 @@ def write(output: DataFrame, output_file_path: str, output_table: str) -> None:
     """Check the output against its contract, write it as parquet, then register its partitions."""
     output = output.persist()
     try:
-        validate_pyspark_dataframe(
-            output,
-            schema_definitions.products_schema,
-            unique_key=["snapshot_date", "product_id"],
-        )
+        validate_pyspark_dataframe(output, schema_definitions.products_schema)
         write_pyspark_dataframe(
             output_dataframe=output,
             output_file_path=output_file_path,

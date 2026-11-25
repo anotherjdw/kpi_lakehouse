@@ -52,6 +52,7 @@ job:
         columns:
           - name: month
             type: date
+            required: true
     - name: filter complete months
       description: Keep the rows whose month is later than or equal to the earliest order_date in the entire DataFrame, so a month the lookback only partly covers is left out.
       inputs: [create month column]
@@ -68,14 +69,19 @@ job:
         columns:
           - name: month
             type: date
+            required: true
           - name: category_id_level_1
             type: string
+            required: false
           - name: units_sold
             type: int
+            required: true
           - name: units_returned
             type: int
+            required: true
           - name: net_refunds_eur
             type: decimal(12,2)
+            required: true
     - name: create return rate column
       description: Create a return rate column, where return_rate = units_returned / units_sold; null when units_sold is 0.
       inputs: [aggregate monthly returns]
@@ -85,6 +91,7 @@ job:
         columns:
           - name: return_rate
             type: decimal(5,4)
+            required: false
     - name: create is_final column
       description: Create an is_final column. Take max(order_date) from filter completed orders as a single value, and cross join it onto every row of create return rate column. is_final is true when max(order_date) is more than 45 days after the last day of month, otherwise false. Drop the max(order_date) column after creating is_final.
       inputs: [create return rate column, filter completed orders]
@@ -95,3 +102,4 @@ job:
         columns:
           - name: is_final
             type: boolean
+            required: true

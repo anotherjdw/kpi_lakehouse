@@ -37,7 +37,7 @@ SOURCES = {
         argument="MARKETING_SPEND_INPUT_PATH",
         rows=inputs.MARKETING_SPEND_ROWS,
         schema=schema_definitions.marketing_spend_raw_schema,
-        file_format="json",
+        file_format="jsonl",
         partition_key="spend_date",
     ),
     "fx_rates": SourceFixture(

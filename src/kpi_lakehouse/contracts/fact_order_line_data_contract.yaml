@@ -1,109 +1,231 @@
-# Output contract of the fact_order_line ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: processed
-  dataset: fact_order_line
-  description: One row per order line, with the customer and product versions valid on the order date, cost, margin, returns and the attributed marketing channel.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [order_id, line_number]    # checked for duplicates on every write
-  schema: # include the partition column, typed date
-    - name: order_date
-      type: date
-      nullable: false
-      description: "Date the order was placed (UTC). Partition column."
-    - name: order_id
-      type: string
-      nullable: false
-      description: "Foreign key to orders.order_id."
-    - name: line_number
-      type: int
-      nullable: false
-      description: "Position of the line within the order, starting at 1."
-      constraints:
-        min: 1
-    - name: customer_id
-      type: string
-      nullable: false
-      description: "Foreign key to customers.customer_id."
-    - name: session_id
-      type: string
-      nullable: true
-      description: "Foreign key to sessions.session_id. Null for orders placed by customer service or without a tracked session."
-    - name: order_ts
-      type: timestamp
-      nullable: false
-      description: "Time the order was placed (UTC)."
-    - name: order_status
-      type: string
-      nullable: false
-      description: "Latest status of the order: placed | paid | shipped | delivered | cancelled."
-    - name: product_id
-      type: string
-      nullable: false
-      description: "Foreign key to products.product_id."
-    - name: quantity
-      type: int
-      nullable: false
-      description: "Units ordered."
-      constraints:
-        min: 1
-    - name: unit_price
-      type: decimal(12,2)
-      nullable: false
-      description: "Price charged per unit, in the order's currency, including VAT, before discount."
-    - name: discount_amount
-      type: decimal(12,2)
-      nullable: false
-      description: "Total discount on the line, in the order's currency, including any voucher value allocated to it."
-    - name: tax_rate
-      type: decimal(5,4)
-      nullable: false
-      description: "VAT rate included in unit_price, e.g. 0.1900."
-    - name: gross_amount_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "Price charged for all units in Euros, including VAT, after discount."
-    - name: net_amount_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "Price charged for all units in Euros, excluding VAT, after discount."
-    - name: customer_version_id
-      type: string
-      nullable: true
-      description: "Foreign key to dim_customer.customer_version_id: the customer version valid on order_date. Null when no version covers order_date."
-    - name: product_version_id
-      type: string
-      nullable: true
-      description: "Foreign key to dim_product.product_version_id: the product version valid on order_date. Null when no version covers order_date."
-    - name: cost_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "quantity * cost_price_eur of the product version valid on order_date. Null when no product version matched."
-    - name: gross_margin_eur
-      type: decimal(12,2)
-      nullable: true
-      description: "net_amount_eur - cost_eur, before returns. Null when cost_eur is null."
-    - name: returned_quantity
-      type: int
-      nullable: false
-      description: "Units returned on this line, summed over its received and refunded returns. 0 when none."
-      constraints:
-        min: 0
-    - name: refund_net_eur
-      type: decimal(12,2)
-      nullable: false
-      description: "Refunds on this line in Euros, excluding VAT, converted at the order-date rate. 0.00 when none."
-    - name: net_revenue_after_returns_eur
-      type: decimal(12,2)
-      nullable: false
-      description: "net_amount_eur - refund_net_eur, in Euros, excluding VAT."
-    - name: mkt_channel
-      type: string
-      nullable: false
-      description: "Attributed channel: the order's session channel, else the customer's latest session channel within the 30 days before order_ts, else direct. paid_search | paid_social | affiliate | email | organic_search | referral | direct."
-    - name: date_key
-      type: int
-      nullable: false
-      description: "order_date as yyyyMMdd."
+apiVersion: v3.2.0
+kind: DataContract
+id: fact_order_line                # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: processed               # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: fact_order_line
+    physicalName: fact_order_line
+    logicalType: object
+    description: >
+      One row per order line, with the customer and product versions valid on the order date, cost,
+      margin, returns and the attributed marketing channel.
+    properties:
+      - name: order_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: Date the order was placed (UTC). Partition column.
+        classification: internal
+        examples: [2026-11-02, 2026-12-04]
+      - name: order_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Foreign key to orders.order_id.
+        classification: internal
+        primaryKey: true
+        relationships:
+          - to: orders.order_id
+        examples: [ORD-000184233, ORD-000007712]
+      - name: line_number
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: Position of the line within the order, starting at 1.
+        classification: internal
+        primaryKey: true
+        logicalTypeOptions:
+          minimum: 1
+        examples: [1, 3]
+      - name: customer_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Foreign key to customers.customer_id.
+        classification: personal
+        relationships:
+          - to: customers.customer_id
+        examples: [ C0041877, C0003921 ]
+      - name: session_id
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          Foreign key to sessions.session_id. Null for orders placed by customer service or without
+          a tracked session.
+        classification: personal
+        relationships:
+          - to: sessions.session_id
+        examples: [ 7c1e9a04b2d64f58a3e0c97b15d2f86a, e40b6d2fa91c4387b5d0a6e2c8f71b39 ]
+      - name: order_ts
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: Time the order was placed (UTC).
+        classification: internal
+        examples: ["2026-11-02T09:41:17.204Z", "2026-10-14T21:03:55.918Z"]
+      - name: order_status
+        logicalType: string
+        physicalType: string
+        required: true
+        description: "Latest status of the order: placed | paid | shipped | delivered | cancelled."
+        classification: internal
+        enum:
+          - value: placed
+          - value: paid
+          - value: shipped
+          - value: delivered
+          - value: cancelled
+        examples: [ paid, delivered, cancelled ]
+      - name: product_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Foreign key to products.product_id.
+        classification: internal
+        relationships:
+          - to: products.product_id
+        examples: [ P00412, P00093 ]
+      - name: quantity
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: Units ordered.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 1
+        examples: [1, 2, 4]
+      - name: unit_price
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: >
+          Price charged per unit, in the order's currency, including VAT, before discount.
+        classification: internal
+        examples: ["59.95", "349.00"]
+      - name: discount_amount
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: >
+          Total discount on the line, in the order's currency, including any voucher value allocated
+          to it.
+        classification: internal
+        examples: ["0.00", "12.00"]
+      - name: tax_rate
+        logicalType: number
+        physicalType: decimal(5,4)
+        required: true
+        description: VAT rate included in unit_price, e.g. 0.1900.
+        classification: internal
+        examples: ["0.1900", "0.2500", "0.0810"]
+      - name: gross_amount_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: Price charged for all units in Euros, including VAT, after discount.
+        classification: internal
+        examples: ["47.96", "349.00"]
+      - name: net_amount_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: Price charged for all units in Euros, excluding VAT, after discount.
+        classification: internal
+        examples: ["40.30", "293.28"]
+      - name: customer_version_id
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          Foreign key to dim_customer.customer_version_id: the customer version valid on order_date.
+          Null when no version covers order_date.
+        classification: personal
+        relationships:
+          - to: dim_customer.customer_version_id
+        examples: [ e1c4a7d02b9f6e3a8c5d1f7b4e0a9c2d6f3b8e5a1c7d4f0b9e2a6c3d8f5b1e7a, 52d8f1b6e3a9c0d7f4b2e8a5c1d6f9b3e0a7c4d2f8b5e1a9c6d3f0b7e4a2c8d5 ]
+      - name: product_version_id
+        logicalType: string
+        physicalType: string
+        required: false
+        description: >
+          Foreign key to dim_product.product_version_id: the product version valid on order_date.
+          Null when no version covers order_date.
+        classification: internal
+        relationships:
+          - to: dim_product.product_version_id
+        examples: [ a83f1c6e9d2b5f08c4e7a1d3b6f9c2e5a8d0b4f7c1e3a6d9b2f5c8e0a4d7b1f3, 0d6b9e2f5a8c1d4e7b0f3a6c9d2e5b8f1a4c7d0e3b6f9a2c5d8e1b4f7a0c3d6e ]
+      - name: cost_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: >
+          quantity * cost_price_eur of the product version valid on order_date. Null when no product
+          version matched.
+        classification: internal
+        examples: ["31.20", "62.40"]
+      - name: gross_margin_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: false
+        description: net_amount_eur - cost_eur, before returns. Null when cost_eur is null.
+        classification: internal
+        examples: ["31.20", "62.40"]
+      - name: returned_quantity
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: >
+          Units returned on this line, summed over its received and refunded returns. 0 when none.
+        classification: internal
+        logicalTypeOptions:
+          minimum: 0
+        examples: [0, 1]
+      - name: refund_net_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: >
+          Refunds on this line in Euros, excluding VAT, converted at the order-date rate. 0.00 when
+          none.
+        classification: internal
+        examples: ["0.00", "40.30"]
+      - name: net_revenue_after_returns_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: net_amount_eur - refund_net_eur, in Euros, excluding VAT.
+        classification: internal
+        examples: ["40.30", "0.00"]
+      - name: mkt_channel
+        logicalType: string
+        physicalType: string
+        required: true
+        description: >
+          Attributed channel: the order's session channel, else the customer's latest session
+          channel within the 30 days before order_ts, else direct. paid_search | paid_social |
+          affiliate | email | organic_search | referral | direct.
+        classification: internal
+        enum:
+          - value: paid_search
+          - value: paid_social
+          - value: affiliate
+          - value: email
+          - value: organic_search
+          - value: referral
+          - value: direct
+        examples: [ paid_search, direct ]
+      - name: date_key
+        logicalType: integer
+        physicalType: int
+        required: true
+        description: order_date as yyyyMMdd.
+        classification: internal
+        relationships:
+          - to: dim_dates.date_key
+        examples: [ 20261102, 20261014 ]

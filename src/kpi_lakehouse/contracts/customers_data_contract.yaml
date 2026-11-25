@@ -1,62 +1,108 @@
-# Output contract of the customers ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: preprocessed
-  dataset: customers
-  description: Versioned customer data.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [ snapshot_date, customer_id ]
-  schema: # include the partition column, typed date
-    - name: snapshot_date
-      type: date
-      nullable: false
-      description: "Date the snapshot reflects. Partition column."
-    - name: customer_id
-      type: string
-      nullable: false
-      description: "Natural key of the customer. Kept after erasure."
-    - name: email
-      type: string
-      nullable: true
-      classification: pii
-      description: "SHA256 hashed value of customer email address. Null after erasure."
-    - name: signup_ts
-      type: timestamp
-      nullable: false
-      description: "Time the account was created (UTC)."
-    - name: country_code
-      type: string
-      nullable: true
-      description: "ISO 3166-1 alpha-2 country of the default address. Null after erasure."
-    - name: postal_code
-      type: string
-      nullable: true
-      classification: pii
-      description: "Postal code of the default address. Null after erasure."
-    - name: customer_segment
-      type: string
-      nullable: false
-      description: "standard | plus (paid membership) | business. Can change over time."
-    - name: marketing_opt_in
-      type: boolean
-      nullable: false
-      description: "Whether the customer consents to marketing email. Can change over time."
-    - name: is_deleted
-      type: boolean
-      nullable: false
-      description: "True once the customer requested erasure under GDPR Art. 17."
-    - name: valid_from
-      type: date
-      nullable: false
-      description: "Snapshot date on which this version of the customer's record was first observed. The underlying change may have taken effect earlier, between the previous snapshot and this one."
-    - name: customer_version_id
-      type: string
-      nullable: false
-      description: "SHA256 hashed ID of the concatenation of the customer_id and valid_from fields."
-    - name: birth_year
-      type: int
-      nullable: true
-      classification: pii
-      description: "Year of birth, optional at signup. Null after erasure."
+apiVersion: v3.2.0
+kind: DataContract
+id: customers                      # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: preprocessed            # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: customers
+    physicalName: customers
+    logicalType: object
+    description: Versioned customer data.
+    properties:
+      - name: snapshot_date
+        logicalType: date
+        physicalType: date
+        required: true
+        classification: internal
+        description: Date the snapshot reflects. Partition column.
+        primaryKey: true
+        examples: [2026-10-21, 2026-11-05]
+      - name: customer_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Natural key of the customer. Kept after erasure.
+        primaryKey: true
+        classification: personal
+        examples: [C0041877, C0003921]
+      - name: email
+        logicalType: string
+        physicalType: string
+        required: false
+        description: SHA256 hashed value of customer email address. Null after erasure.
+        classification: personal
+        examples: [9b74c9897bac770ffc029102a200c5de4f7a2f6e3c1d08b5e9a0f2d4c6b8e1a3, 3f0a6d82c1e94b7d5a2c8e6f0b4d9a1c7e5f3b2d8a6c4e0f9b1d7a3c5e8f2b6d]
+      - name: signup_ts
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: Time the account was created (UTC).
+        classification: internal
+        examples: [ "2024-06-11T18:27:40.512Z", "2026-02-03T08:05:19.090Z" ]
+      - name: country_code
+        logicalType: string
+        physicalType: string
+        required: false
+        description: ISO 3166-1 alpha-2 country of the default address. Null after erasure.
+        classification: internal
+        examples: [ PL, SE, DK ]
+      - name: postal_code
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Postal code of the default address. Null after erasure.
+        classification: personal
+        examples: [30-059, 211 45, "8000"]
+      - name: customer_segment
+        logicalType: string
+        physicalType: string
+        required: true
+        description: standard | plus (paid membership) | business. Can change over time.
+        classification: internal
+        enum:
+          - value: standard
+          - value: plus
+          - value: business
+        examples: [ standard, plus ]
+      - name: marketing_opt_in
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        description: Whether the customer consents to marketing email. Can change over time.
+        classification: internal
+        examples: [true, false]
+      - name: is_deleted
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        description: True once the customer requested erasure under GDPR Art. 17.
+        classification: internal
+        examples: [ true, false ]
+      - name: valid_from
+        logicalType: date
+        physicalType: date
+        required: true
+        description: >
+          Snapshot date on which this version of the customer's record was first observed. The
+          underlying change may have taken effect earlier, between the previous snapshot and this
+          one.
+        classification: internal
+        examples: [2026-10-21, 2026-11-05]
+      - name: customer_version_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: SHA256 hashed ID of the concatenation of the customer_id and valid_from fields.
+        classification: personal
+        examples: [e1c4a7d02b9f6e3a8c5d1f7b4e0a9c2d6f3b8e5a1c7d4f0b9e2a6c3d8f5b1e7a, 52d8f1b6e3a9c0d7f4b2e8a5c1d6f9b3e0a7c4d2f8b5e1a9c6d3f0b7e4a2c8d5]
+      - name: birth_year
+        logicalType: integer
+        physicalType: int
+        required: false
+        description: Year of birth, optional at signup. Null after erasure.
+        classification: personal
+        examples: [1988, 1972]

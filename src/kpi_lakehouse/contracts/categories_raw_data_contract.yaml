@@ -1,38 +1,61 @@
-# Source contract categories_raw: data no job in this project writes. Describe the files exactly
-# as they are on disk. Generation-time input; never deployed.
-contract:
-  layer: raw                  # raw | preprocessed | processed
-  dataset: categories
-  file_format: json
-  description: >
-    Full export of the category tree as parent/child pairs, overwritten on every export. The tree
-    is up to four levels deep; root categories have no parent.
-  owner: Product information management (PIM)
-  classification:
-    contains_pii: false
-  freshness:
-    cadence: daily
-    max_lateness: 1 day
-  grain:
-    unique_key: [category_id]
-  schema:
-    - name: category_id
-      type: string
-      nullable: false
-      description: "Natural key of the category."
-    - name: category_name
-      type: string
-      nullable: false
-      description: "Display name, e.g. Running Shoes."
-    - name: parent_category_id
-      type: string
-      nullable: true
-      description: "category_id of the parent. Null for a root category."
-    - name: is_active
-      type: boolean
-      nullable: false
-      description: "False once the category is retired; retired categories stay for history."
-    - name: updated_at
-      type: timestamp
-      nullable: false
-      description: "Time the category was last changed (UTC)."
+apiVersion: v3.2.0
+kind: DataContract
+id: categories_raw                 # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+team:
+  name: Product information management (PIM)
+customProperties:
+  - property: layer
+    value: raw                     # raw | preprocessed | processed
+  - property: fileFormat
+    value: jsonl
+schema:
+  - name: categories_raw
+    physicalName: categories
+    logicalType: object
+    description: >
+      Full export of the category tree as parent/child pairs, overwritten on every export. The tree
+      is up to four levels deep; root categories have no parent.
+    properties:
+      - name: category_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Natural key of the category.
+        primaryKey: true
+        classification: internal
+        logicalTypeOptions:
+          pattern: "^CAT-[0-9]{4}$"
+        examples: [ CAT-0007, CAT-0031 ]
+      - name: category_name
+        logicalType: string
+        physicalType: string
+        required: true
+        classification: internal
+        description: Display name, e.g. Running Shoes.
+        examples: [ Running Shoes, Kitchen Textiles, Desk Lamps ]
+      - name: parent_category_id
+        logicalType: string
+        physicalType: string
+        required: false
+        classification: internal
+        description: category_id of the parent. Null for a root category.
+        logicalTypeOptions:
+          pattern: "^CAT-[0-9]{4}$"
+        relationships:
+          - to: categories_raw.category_id
+        examples: [ CAT-0002, CAT-0019 ]
+      - name: is_active
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        classification: internal
+        description: False once the category is retired; retired categories stay for history.
+        examples: [ true, false ]
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        classification: internal
+        description: Time the category was last changed (UTC).
+        examples: [ "2026-09-30T11:14:52.380Z", "2026-11-04T06:48:09.725Z" ]

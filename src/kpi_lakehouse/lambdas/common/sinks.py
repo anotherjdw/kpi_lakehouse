@@ -52,9 +52,9 @@ class RawWriter:
             self.buffer.items(), key=lambda kv: (kv[0][0], kv[0][1] or "")
         ):
             contract = self.contracts[dataset]
-            if contract.file_format != "json":
+            if contract.file_format != "jsonl":
                 raise ValueError(
-                    f"{dataset}: only JSON contracts can be written, not {contract.file_format}"
+                    f"{dataset}: only jsonl contracts can be written, not {contract.file_format}"
                 )
             key = contract.partition_key
             if key:

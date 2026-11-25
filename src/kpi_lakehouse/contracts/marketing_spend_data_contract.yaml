@@ -1,62 +1,114 @@
-# Output contract of the marketing_spend ETL job: the dataset it writes. Generation-time input;
-# never deployed. Fill in every value shaped like <...>.
-contract:
-  layer: preprocessed
-  dataset: marketing_spend
-  description: >
-    Daily spend per campaign pulled from the advertising platforms' reporting APIs. Platforms
-    restate the last three days as late clicks and invalid traffic are settled, so a
-    spend_date and campaign can be reported several times; the latest reported_at wins.
-  table: hive               # a Hive table over this dataset; needs sink.partition_key and
-                            # snake_case dataset and column names
-  grain:
-    unique_key: [ spend_date, platform, campaign_id, reported_at ]
-  schema: # include the partition column, typed date
-    - name: spend_date
-      type: date
-      nullable: false
-      description: "Date the spend was incurred, in the platform's account time zone. Partition column."
-    - name: platform
-      type: string
-      nullable: false
-      description: "google_ads | meta | tiktok | affiliate_network | newsletter_tool."
-    - name: campaign_id
-      type: string
-      nullable: false
-      description: "Campaign ID within the platform."
-    - name: campaign_name
-      type: string
-      nullable: false
-      description: "Campaign name as set in the platform."
-    - name: utm_source
-      type: string
-      nullable: true
-      description: "utm_source the campaign's links carry."
-    - name: utm_medium
-      type: string
-      nullable: true
-      description: "utm_medium the campaign's links carry."
-    - name: utm_campaign
-      type: string
-      nullable: true
-      description: "utm_campaign the campaign's links carry; joins spend to sessions."
-    - name: impressions
-      type: bigint
-      nullable: false
-      description: "Ad impressions reported for the day."
-    - name: clicks
-      type: bigint
-      nullable: false
-      description: "Ad clicks reported for the day."
-    - name: spend_amount_eur
-      type: decimal(12,2)
-      nullable: false
-      description: "Spend for the day in Euros, excluding VAT."
-    - name: currency_code
-      type: string
-      nullable: false
-      description: "ISO 4217 currency of the platform account."
-    - name: reported_at
-      type: timestamp
-      nullable: false
-      description: "Time the platform reported this figure (UTC). Later reports replace earlier ones."
+apiVersion: v3.2.0
+kind: DataContract
+id: marketing_spend                # the contract's name: its file name without _data_contract.yaml
+version: 1.0.0
+customProperties:
+  - property: layer
+    value: preprocessed            # raw | preprocessed | processed
+  - property: table
+    value: hive
+schema:
+  - name: marketing_spend
+    physicalName: marketing_spend
+    logicalType: object
+    description: >
+      Daily spend per campaign pulled from the advertising platforms' reporting APIs. Platforms
+      restate the last three days as late clicks and invalid traffic are settled, so a spend_date
+      and campaign can be reported several times; the latest reported_at wins.
+    properties:
+      - name: spend_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: >
+          Date the spend was incurred, in the platform's account time zone. Partition column.
+        classification: internal
+        primaryKey: true
+        examples: [2026-11-09, 2026-12-02]
+      - name: platform
+        logicalType: string
+        physicalType: string
+        required: true
+        description: google_ads | meta | tiktok | affiliate_network | newsletter_tool.
+        classification: internal
+        primaryKey: true
+        enum:
+          - value: google_ads
+          - value: meta
+          - value: tiktok
+          - value: affiliate_network
+          - value: newsletter_tool
+        examples: [ google_ads, meta, affiliate_network ]
+      - name: campaign_id
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Campaign ID within the platform.
+        classification: internal
+        primaryKey: true
+        examples: [GA-2107, MT-5530, AF-4012]
+      - name: campaign_name
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Campaign name as set in the platform.
+        classification: internal
+        examples: [Winter Boots DE, Retargeting Nordics]
+      - name: utm_source
+        logicalType: string
+        physicalType: string
+        required: false
+        description: utm_source the campaign's links carry.
+        classification: internal
+        examples: [google, facebook, awin]
+      - name: utm_medium
+        logicalType: string
+        physicalType: string
+        required: false
+        description: utm_medium the campaign's links carry.
+        classification: internal
+        examples: [cpc, paid_social, affiliate]
+      - name: utm_campaign
+        logicalType: string
+        physicalType: string
+        required: false
+        description: utm_campaign the campaign's links carry; joins spend to sessions.
+        classification: internal
+        examples: [winter_boots_de, retargeting_nordics]
+      - name: impressions
+        logicalType: integer
+        physicalType: bigint
+        required: true
+        description: Ad impressions reported for the day.
+        classification: internal
+        examples: [48210, 1305977]
+      - name: clicks
+        logicalType: integer
+        physicalType: bigint
+        required: true
+        description: Ad clicks reported for the day.
+        classification: internal
+        examples: [1872, 0]
+      - name: spend_amount_eur
+        logicalType: number
+        physicalType: decimal(12,2)
+        required: true
+        description: Spend for the day in Euros, excluding VAT.
+        classification: confidential
+        examples: ["842.17", "1123.40"]
+      - name: currency_code
+        logicalType: string
+        physicalType: string
+        required: true
+        description: ISO 4217 currency of the platform account.
+        classification: internal
+        examples: [EUR, SEK]
+      - name: reported_at
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: >
+          Time the platform reported this figure (UTC). Later reports replace earlier ones.
+        primaryKey: true
+        classification: internal
+        examples: ["2026-11-02T03:15:44.002Z", "2026-10-30T03:16:21.457Z"]

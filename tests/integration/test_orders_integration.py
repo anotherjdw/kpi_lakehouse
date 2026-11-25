@@ -5,17 +5,20 @@ each source's file format and partition layout. test_transform and test_write co
 the job's output, the reviewed expected rows of its last transformation.
 """
 
+import json
 from collections.abc import Iterator
 from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
+from py4j.protocol import Py4JJavaError
 from pyspark.sql import SparkSession
 
 from kpi_lakehouse.jobs.orders import (
     orders_transformations as job,
 )
 from kpi_lakehouse.utils.schema import schema_definitions
+from kpi_lakehouse.utils.spark import spark_session
 from tests.fixtures.orders import expected, inputs
 from tests.helpers import (
     SourceFixture,
@@ -37,7 +40,7 @@ SOURCES = {
         argument="ORDERS_INPUT_PATH",
         rows=inputs.ORDERS_ROWS,
         schema=schema_definitions.orders_raw_schema,
-        file_format="json",
+        file_format="jsonl",
         partition_key="export_date",
     ),
     "fx_rates": SourceFixture(
@@ -156,3 +159,47 @@ def test_write_incorrect_schema(spark: SparkSession, test_dir: Path, output_tabl
         job.write(output, str(test_dir), output_table)
     # A write that fails its checks registers nothing.
     assert registered_partitions(spark, output_table) == []
+
+
+def _add_order_record(test_dir: Path, **changes: object) -> list[str]:
+    """Write the sources, then add one record to an orders file: a copy of its first record
+    under a new order_id, with `changes` applied as the JSON text the export would hold.
+
+    Returns:
+        The job's arguments, for parse_arguments.
+    """
+    argv = write_sources(spark_session(), SOURCES, test_dir)
+    path = next((test_dir / "orders").glob("export_date=*/*.json"))
+    first = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    record = {**first, "order_id": "ORD-000009999", **changes}
+    with path.open("a", encoding="utf-8") as file:
+        file.write(json.dumps(record) + "\n")
+    return argv
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"shipping_fee": "abc"},
+        {"updated_at": "2026-10-15T10:12:30.120456Z"},
+        {"updated_at": "2026-10-15T10:12:30Z"},
+    ],
+    ids=["value-not-of-its-type", "timestamp-finer-than-milliseconds", "timestamp-no-fraction"],
+)
+def test_read_malformed_value_raises(test_dir: Path, changes: dict[str, object]) -> None:
+    """A value the contract's type or format can't read fails the read, not a null.
+
+    Spark names most as malformed records. A timestamp with too many fraction digits it
+    reports as one its own parser can't read, though Spark's pre-3.0 parser could
+    (spark.sql.legacy.timeParserPolicy, left at its default EXCEPTION).
+    """
+    args = job.parse_arguments(_add_order_record(test_dir, **changes))
+    with pytest.raises(Py4JJavaError, match="Malformed records|Fail to parse"):
+        job.read(args, processing_dates(SOURCES))
+
+
+def test_read_value_breaking_a_rule_raises(test_dir: Path) -> None:
+    """A value outside the contract's allowed values fails the read."""
+    args = job.parse_arguments(_add_order_record(test_dir, order_status="lost"))
+    with pytest.raises(ValueError, match=r"outside the allowed values \{'order_status': 1\}"):
+        job.read(args, processing_dates(SOURCES))

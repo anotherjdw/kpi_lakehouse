@@ -34,6 +34,7 @@ job:
         columns:            # columns this transformation adds; delete the block if none
           - name: valid_to
             type: date
+            required: false
     - name: create is_current flag
       description: >
         Create an is_current column, where is_current is true when valid_to is null. Otherwise the value is false.
@@ -44,6 +45,7 @@ job:
         columns:
           - name: is_current
             type: boolean
+            required: true
     - name: select dimensions
       description: >-
         Select the customer_version_id, customer_id, customer_segment, country_code, marketing_opt_in, birth_year, postal_code, valid_from, valid_to and is_current.
